@@ -10,14 +10,15 @@ import string
 import hashlib
 import gspread
 from google.oauth2.service_account import Credentials
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-# --- Configuration & Styling ---
 # --- Configuration & Styling ---
 st.set_page_config(
     page_title="SplitSync",
     page_icon="💸",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
 # Custom CSS for a premium look
@@ -56,7 +57,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- Data Management ---
-# --- Data Management ---
 DATA_FILE = "data.json"
 
 # Google Sheets Configuration
@@ -76,6 +76,34 @@ def get_gsheet_client():
     except Exception as e:
         st.error(f"Error connecting to Google Sheets: {e}")
         return None
+
+def send_email(to_email, subject, body):
+    if "email" not in st.secrets:
+        st.error("Email configuration missing in secrets.")
+        return False
+    
+    smtp_server = st.secrets["email"]["smtp_server"]
+    smtp_port = st.secrets["email"]["smtp_port"]
+    sender_email = st.secrets["email"]["sender_email"]
+    sender_password = st.secrets["email"]["sender_password"]
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, to_email, text)
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Failed to send email: {e}")
+        return False
 
 def load_data():
     client = get_gsheet_client()
@@ -208,7 +236,7 @@ def save_data(data):
         if users_rows:
             ws.update(range_name='A1', values=[list(users_rows[0].keys())] + [list(r.values()) for r in users_rows])
         else:
-            ws.update(range_name='A1', values=[["username", "password"]]) # Header only
+            ws.update(range_name='A1', values=[["username", "password", "email"]]) # Header only
 
         # Update Events Sheet
         try:
@@ -298,16 +326,29 @@ if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 if 'current_event' not in st.session_state:
     st.session_state.current_event = None
+if 'reg_step' not in st.session_state:
+    st.session_state.reg_step = 1
+if 'reg_code' not in st.session_state:
+    st.session_state.reg_code = None
+if 'reg_data' not in st.session_state:
+    st.session_state.reg_data = {}
+if 'reset_step' not in st.session_state:
+    st.session_state.reset_step = 1
+if 'reset_code' not in st.session_state:
+    st.session_state.reset_code = None
+if 'reset_email' not in st.session_state:
+    st.session_state.reset_email = None
 
 data = st.session_state.data
 
 # --- Login Screen ---
 if not st.session_state.current_user:
     st.title("👋 Welcome to SplitSync")
-    st.markdown("Please login to continue.")
     
-    col1, col2 = st.columns([1, 2])
-    with col1:
+    tab1, tab2, tab3 = st.tabs(["Login", "Register", "Forgot Password"])
+    
+    with tab1:
+        st.markdown("Please login to continue.")
         username_input = st.text_input("Username")
         password_input = st.text_input("Password", type="password")
         
@@ -322,31 +363,106 @@ if not st.session_state.current_user:
             
             if not user_found:
                 st.error("Invalid username or password.")
-            
-    st.divider()
-    with st.expander("New User? Register here"):
-        with st.form("register_form"):
-            new_username = st.text_input("Choose Username")
-            new_password = st.text_input("Choose Password", type="password")
-            confirm_password = st.text_input("Confirm Password", type="password")
-            
-            if st.form_submit_button("Register"):
-                if new_username and new_password:
-                    if new_password != confirm_password:
-                        st.error("Passwords do not match.")
-                    elif any(u['username'] == new_username for u in data['users']):
-                        st.warning("Username already exists.")
+
+    with tab2:
+        st.markdown("Create a new account.")
+        if st.session_state.reg_step == 1:
+            with st.form("reg_form_1"):
+                new_username = st.text_input("Choose Username")
+                new_email = st.text_input("Email Address")
+                new_password = st.text_input("Choose Password", type="password")
+                confirm_password = st.text_input("Confirm Password", type="password")
+                
+                if st.form_submit_button("Next: Verify Email"):
+                    if new_username and new_email and new_password:
+                        if new_password != confirm_password:
+                            st.error("Passwords do not match.")
+                        elif any(u['username'] == new_username for u in data['users']):
+                            st.warning("Username already exists.")
+                        elif any(u.get('email') == new_email for u in data['users']):
+                            st.warning("Email already registered.")
+                        else:
+                            # Generate Code
+                            code = ''.join(random.choices(string.digits, k=6))
+                            if send_email(new_email, "SplitSync Verification Code", f"Your code is: {code}"):
+                                st.session_state.reg_code = code
+                                st.session_state.reg_data = {
+                                    "username": new_username,
+                                    "email": new_email,
+                                    "password": hash_password(new_password)
+                                }
+                                st.session_state.reg_step = 2
+                                st.rerun()
+                            else:
+                                st.error("Failed to send email. Check configuration.")
                     else:
-                        new_user = {
-                            "username": new_username,
-                            "password": hash_password(new_password)
-                        }
-                        data['users'].append(new_user)
-                        save_data(data)
-                        st.session_state.data = data
-                        st.success(f"User {new_username} registered! Please login.")
+                        st.error("Please fill all fields.")
+        
+        elif st.session_state.reg_step == 2:
+            st.info(f"Verification code sent to {st.session_state.reg_data.get('email')}")
+            code_input = st.text_input("Enter Verification Code")
+            if st.button("Verify & Register"):
+                if code_input == st.session_state.reg_code:
+                    data['users'].append(st.session_state.reg_data)
+                    save_data(data)
+                    st.session_state.data = data
+                    st.success(f"User {st.session_state.reg_data['username']} registered! Please login.")
+                    # Reset state
+                    st.session_state.reg_step = 1
+                    st.session_state.reg_code = None
+                    st.session_state.reg_data = {}
                 else:
-                    st.error("Please fill all fields.")
+                    st.error("Invalid code.")
+            if st.button("Back"):
+                st.session_state.reg_step = 1
+                st.rerun()
+
+    with tab3:
+        st.markdown("Reset your password.")
+        if st.session_state.reset_step == 1:
+            reset_email = st.text_input("Enter your registered email")
+            if st.button("Send Reset Code"):
+                user_exists = False
+                for u in data['users']:
+                    if u.get('email') == reset_email:
+                        user_exists = True
+                        break
+                
+                if user_exists:
+                    code = ''.join(random.choices(string.digits, k=6))
+                    if send_email(reset_email, "SplitSync Password Reset", f"Your reset code is: {code}"):
+                        st.session_state.reset_code = code
+                        st.session_state.reset_email = reset_email
+                        st.session_state.reset_step = 2
+                        st.rerun()
+                    else:
+                        st.error("Failed to send email.")
+                else:
+                    st.error("Email not found.")
+        
+        elif st.session_state.reset_step == 2:
+            st.info(f"Reset code sent to {st.session_state.reset_email}")
+            reset_code_input = st.text_input("Enter Reset Code")
+            new_pass = st.text_input("New Password", type="password")
+            
+            if st.button("Reset Password"):
+                if reset_code_input == st.session_state.reset_code:
+                    # Update password
+                    for u in data['users']:
+                        if u.get('email') == st.session_state.reset_email:
+                            u['password'] = hash_password(new_pass)
+                            break
+                    save_data(data)
+                    st.session_state.data = data
+                    st.success("Password reset successful! Please login.")
+                    st.session_state.reset_step = 1
+                    st.session_state.reset_code = None
+                    st.session_state.reset_email = None
+                else:
+                    st.error("Invalid code.")
+            if st.button("Cancel"):
+                st.session_state.reset_step = 1
+                st.rerun()
 
 # --- Event Selection Screen ---
 elif not st.session_state.current_event:
