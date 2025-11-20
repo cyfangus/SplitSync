@@ -8,6 +8,8 @@ from datetime import datetime
 import random
 import string
 import hashlib
+import gspread
+from google.oauth2.service_account import Credentials
 
 # --- Configuration & Styling ---
 # --- Configuration & Styling ---
@@ -54,23 +56,186 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- Data Management ---
+# --- Data Management ---
 DATA_FILE = "data.json"
 
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        default_data = {
-            "users": [],
-            "events": []
-        }
-        save_data(default_data)
-        return default_data
-    
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+# Google Sheets Configuration
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
-def save_data(data):
+def get_gsheet_client():
+    try:
+        if "gcp_service_account" in st.secrets:
+            creds = Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"], scopes=SCOPES
+            )
+            return gspread.authorize(creds)
+        return None
+    except Exception as e:
+        st.error(f"Error connecting to Google Sheets: {e}")
+        return None
+
+def load_data():
+    client = get_gsheet_client()
+    
+    # Fallback to local if no cloud connection
+    if not client:
+        if not os.path.exists(DATA_FILE):
+            default_data = {"users": [], "events": []}
+            save_local_data(default_data)
+            return default_data
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+
+    try:
+        # Open Spreadsheet (Assumes name 'SplitSync_DB' or uses URL from secrets)
+        sheet_url = st.secrets.get("private_gsheets_url")
+        if sheet_url:
+            sh = client.open_by_url(sheet_url)
+        else:
+            sh = client.open("SplitSync_DB")
+
+        # Load Users
+        try:
+            users_ws = sh.worksheet("Users")
+            users = users_ws.get_all_records()
+        except:
+            users = []
+
+        # Load Events
+        try:
+            events_ws = sh.worksheet("Events")
+            events_raw = events_ws.get_all_records()
+        except:
+            events_raw = []
+
+        # Load Expenses
+        try:
+            expenses_ws = sh.worksheet("Expenses")
+            expenses_raw = expenses_ws.get_all_records()
+        except:
+            expenses_raw = []
+
+        # Reconstruct Data Structure
+        data = {"users": users, "events": []}
+        
+        # Map expenses to events
+        expenses_by_event = {}
+        for exp in expenses_raw:
+            eid = exp['event_id']
+            if eid not in expenses_by_event:
+                expenses_by_event[eid] = []
+            
+            # Parse 'involved' back from string to list
+            if isinstance(exp.get('involved'), str):
+                try:
+                    exp['involved'] = json.loads(exp['involved'])
+                except:
+                    exp['involved'] = []
+            
+            # Remove event_id from expense object to match internal schema
+            del exp['event_id']
+            expenses_by_event[eid].append(exp)
+
+        for evt in events_raw:
+            # Parse 'members' back from string
+            if isinstance(evt.get('members'), str):
+                try:
+                    evt['members'] = json.loads(evt['members'])
+                except:
+                    evt['members'] = []
+            
+            evt['expenses'] = expenses_by_event.get(evt['id'], [])
+            data['events'].append(evt)
+
+        return data
+
+    except Exception as e:
+        st.error(f"Failed to load from Cloud: {e}. Using local backup.")
+        if not os.path.exists(DATA_FILE):
+            return {"users": [], "events": []}
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+
+def save_local_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
+
+def save_data(data):
+    client = get_gsheet_client()
+    
+    # Always save local backup
+    save_local_data(data)
+
+    if not client:
+        return
+
+    try:
+        sheet_url = st.secrets.get("private_gsheets_url")
+        if sheet_url:
+            sh = client.open_by_url(sheet_url)
+        else:
+            sh = client.open("SplitSync_DB")
+
+        # Prepare Data for Sheets
+        users_rows = data['users']
+        
+        events_rows = []
+        expenses_rows = []
+        
+        for evt in data['events']:
+            # Clone event to avoid modifying state
+            evt_row = evt.copy()
+            evt_row['members'] = json.dumps(evt_row['members']) # Serialize list
+            del evt_row['expenses'] # Don't store nested expenses in event row
+            events_rows.append(evt_row)
+            
+            for exp in evt['expenses']:
+                exp_row = exp.copy()
+                exp_row['event_id'] = evt['id']
+                exp_row['involved'] = json.dumps(exp_row['involved']) # Serialize list
+                expenses_rows.append(exp_row)
+
+        # Update Users Sheet
+        try:
+            ws = sh.worksheet("Users")
+            ws.clear()
+        except:
+            ws = sh.add_worksheet("Users", 1000, 10)
+        
+        if users_rows:
+            ws.update([list(users_rows[0].keys())] + [list(r.values()) for r in users_rows])
+        else:
+            ws.update([["username", "password"]]) # Header only
+
+        # Update Events Sheet
+        try:
+            ws = sh.worksheet("Events")
+            ws.clear()
+        except:
+            ws = sh.add_worksheet("Events", 1000, 10)
+            
+        if events_rows:
+            ws.update([list(events_rows[0].keys())] + [list(r.values()) for r in events_rows])
+        else:
+            ws.update([["id", "name", "members", "access_code"]])
+
+        # Update Expenses Sheet
+        try:
+            ws = sh.worksheet("Expenses")
+            ws.clear()
+        except:
+            ws = sh.add_worksheet("Expenses", 1000, 10)
+            
+        if expenses_rows:
+            ws.update([list(expenses_rows[0].keys())] + [list(r.values()) for r in expenses_rows])
+        else:
+            ws.update([["id", "title", "amount", "payer", "involved", "date", "category", "settled", "event_id"]])
+
+    except Exception as e:
+        st.warning(f"Could not sync to Cloud: {e}")
 
 def calculate_debts(expenses, members):
     # Calculate net balances
