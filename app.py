@@ -143,7 +143,7 @@ if not df.empty:
 
 # --- Sidebar ---
 with st.sidebar:
-    st.title("💸 SplitSync")
+    st.title("💸 SplitPay")
     st.markdown("Manage shared expenses easily.")
     
     menu = st.radio("Navigation", ["Dashboard", "Add Expense", "Settle Expenses", "Manage Members", "Data View"])
