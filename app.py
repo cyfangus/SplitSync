@@ -206,9 +206,9 @@ def save_data(data):
             ws = sh.add_worksheet("Users", 1000, 10)
         
         if users_rows:
-            ws.update([list(users_rows[0].keys())] + [list(r.values()) for r in users_rows])
+            ws.update(range_name='A1', values=[list(users_rows[0].keys())] + [list(r.values()) for r in users_rows])
         else:
-            ws.update([["username", "password"]]) # Header only
+            ws.update(range_name='A1', values=[["username", "password"]]) # Header only
 
         # Update Events Sheet
         try:
@@ -218,9 +218,9 @@ def save_data(data):
             ws = sh.add_worksheet("Events", 1000, 10)
             
         if events_rows:
-            ws.update([list(events_rows[0].keys())] + [list(r.values()) for r in events_rows])
+            ws.update(range_name='A1', values=[list(events_rows[0].keys())] + [list(r.values()) for r in events_rows])
         else:
-            ws.update([["id", "name", "members", "access_code"]])
+            ws.update(range_name='A1', values=[["id", "name", "members", "access_code"]])
 
         # Update Expenses Sheet
         try:
@@ -230,9 +230,9 @@ def save_data(data):
             ws = sh.add_worksheet("Expenses", 1000, 10)
             
         if expenses_rows:
-            ws.update([list(expenses_rows[0].keys())] + [list(r.values()) for r in expenses_rows])
+            ws.update(range_name='A1', values=[list(expenses_rows[0].keys())] + [list(r.values()) for r in expenses_rows])
         else:
-            ws.update([["id", "title", "amount", "payer", "involved", "date", "category", "settled", "event_id"]])
+            ws.update(range_name='A1', values=[["id", "title", "amount", "payer", "involved", "date", "category", "settled", "event_id"]])
 
     except Exception as e:
         st.warning(f"Could not sync to Cloud: {e}")
