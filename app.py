@@ -586,10 +586,15 @@ else:
     if menu == "Dashboard":
         st.title(current_event['name'])
         
-        unsettled_df = df[~df['settled']] if not df.empty and 'settled' in df.columns else df
-        if 'settled' not in df.columns and not df.empty:
-             df['settled'] = False
-             unsettled_df = df
+        # Ensure 'settled' column exists and is boolean
+        if not df.empty:
+            if 'settled' not in df.columns:
+                df['settled'] = False
+            # Convert to boolean if needed
+            df['settled'] = df['settled'].astype(bool)
+            unsettled_df = df[df['settled'] == False]
+        else:
+            unsettled_df = df
 
         if df.empty:
             st.info("No expenses recorded yet.")
