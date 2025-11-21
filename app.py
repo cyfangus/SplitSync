@@ -512,6 +512,7 @@ elif not st.session_state.current_event:
                         "id": f"event_{len(data['events']) + 1}",
                         "name": event_name,
                         "members": members,
+                        "roles": {st.session_state.current_user: "admin"},  # Creator is admin
                         "expenses": [],
                         "access_code": access_code
                     }
@@ -528,23 +529,32 @@ elif not st.session_state.current_event:
         with st.form("join_event"):
             code_input = st.text_input("Enter Access Code", placeholder="e.g. ABC123")
             if st.form_submit_button("Join"):
-                found_event = None
-                for event in data['events']:
-                    if event.get('access_code') == code_input:
-                        found_event = event
-                        break
-                
-                if found_event:
-                    if st.session_state.current_user not in found_event['members']:
-                        found_event['members'].append(st.session_state.current_user)
-                        save_data(data)
-                        st.session_state.data = data
-                        st.success(f"Joined {found_event['name']}!")
-                        st.rerun()
+                if code_input:
+                    # Find event with matching code
+                    matching_event = None
+                    for evt in data['events']:
+                        if evt.get('access_code') == code_input.upper():
+                            matching_event = evt
+                            break
+                    
+                    if matching_event:
+                        if st.session_state.current_user not in matching_event['members']:
+                            matching_event['members'].append(st.session_state.current_user)
+                            # Ensure roles dict exists
+                            if 'roles' not in matching_event:
+                                matching_event['roles'] = {}
+                            # Assign member role
+                            matching_event['roles'][st.session_state.current_user] = "member"
+                            save_data(data)
+                            st.session_state.data = data
+                            st.success(f"Joined {matching_event['name']}!")
+                            st.rerun()
+                        else:
+                            st.info("You are already a member of this event.")
                     else:
-                        st.info("You are already a member of this event.")
+                        st.error("Invalid Access Code.")
                 else:
-                    st.error("Invalid Access Code.")
+                    st.error("Please enter an access code.")
 
 # --- Main Event Dashboard ---
 else:
@@ -560,11 +570,20 @@ else:
         
     current_event = data['events'][current_event_idx]
     
+    # Helper function to check if current user is admin
+    def is_admin():
+        roles = current_event.get('roles', {})
+        return roles.get(st.session_state.current_user) == 'admin'
+    
     # Sidebar
     with st.sidebar:
         st.title("💸 SplitSync")
         st.caption(f"Event: {current_event['name']}")
-        st.caption(f"User: {st.session_state.current_user}")
+        
+        # Display user and role
+        user_role = current_event.get('roles', {}).get(st.session_state.current_user, 'member')
+        role_emoji = "👑" if user_role == "admin" else "👤"
+        st.caption(f"{role_emoji} {st.session_state.current_user} ({user_role.title()})")
         
         # Display Access Code
         code = current_event.get('access_code', 'N/A')
@@ -686,7 +705,11 @@ else:
     elif menu == "Edit Expenses":
         st.title("Edit Expenses")
         
-        if not current_event['expenses']:
+        # Check if user is admin
+        if not is_admin():
+            st.warning("⚠️ Only event admins can edit or delete expenses.")
+            st.info("Contact an admin if you need to modify an expense.")
+        elif not current_event['expenses']:
             st.info("No expenses to edit yet.")
         else:
             # Initialize session state for edit tracking
