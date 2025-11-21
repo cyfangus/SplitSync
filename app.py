@@ -641,7 +641,17 @@ else:
     # --- Add Expense ---
     elif menu == "Add Expense":
         st.title("Add Expense")
-        with st.form("add_expense"):
+        
+        # Initialize session state for form submission tracking
+        if 'expense_saved' not in st.session_state:
+            st.session_state.expense_saved = False
+        
+        # Show success message if expense was just saved
+        if st.session_state.expense_saved:
+            st.success("✅ Expense saved successfully!")
+            st.session_state.expense_saved = False
+        
+        with st.form("add_expense", clear_on_submit=True):
             title = st.text_input("Description")
             amount = st.number_input("Amount", min_value=0.01)
             payer = st.selectbox("Paid By", current_event['members'], index=current_event['members'].index(st.session_state.current_user) if st.session_state.current_user in current_event['members'] else 0)
@@ -649,25 +659,28 @@ else:
             involved = st.multiselect("Split Among", current_event['members'], default=current_event['members'])
             date = st.date_input("Date", datetime.today())
             
-            if st.form_submit_button("Save"):
+            submitted = st.form_submit_button("Save Expense")
+            
+            if submitted:
                 if title and involved:
-                    new_expense = {
-                        "id": len(current_event['expenses']) + 1,
-                        "title": title,
-                        "amount": amount,
-                        "payer": payer,
-                        "involved": involved,
-                        "date": str(date),
-                        "category": category,
-                        "settled": False
-                    }
-                    current_event['expenses'].append(new_expense)
-                    save_data(data)
-                    st.session_state.data = data
-                    st.success("Added!")
-                    st.rerun()
+                    with st.spinner("Saving expense..."):
+                        new_expense = {
+                            "id": len(current_event['expenses']) + 1,
+                            "title": title,
+                            "amount": amount,
+                            "payer": payer,
+                            "involved": involved,
+                            "date": str(date),
+                            "category": category,
+                            "settled": False
+                        }
+                        current_event['expenses'].append(new_expense)
+                        save_data(data)
+                        st.session_state.data = data
+                        st.session_state.expense_saved = True
+                        st.rerun()
                 else:
-                    st.error("Please fill all fields.")
+                    st.error("Please fill all required fields.")
 
     # --- Settle Expenses ---
     elif menu == "Settle Expenses":
