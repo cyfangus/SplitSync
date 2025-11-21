@@ -575,7 +575,7 @@ else:
             st.rerun()
             
         st.divider()
-        menu = st.radio("Navigation", ["Dashboard", "Add Expense", "Settle Expenses", "Manage Event"])
+        menu = st.radio("Navigation", ["Dashboard", "Add Expense", "Edit Expenses", "Settle Expenses", "Manage Event"])
 
     # Data Prep
     df = pd.DataFrame(current_event['expenses'])
@@ -681,6 +681,113 @@ else:
                         st.rerun()
                 else:
                     st.error("Please fill all required fields.")
+
+    # --- Edit Expenses ---
+    elif menu == "Edit Expenses":
+        st.title("Edit Expenses")
+        
+        if not current_event['expenses']:
+            st.info("No expenses to edit yet.")
+        else:
+            # Initialize session state for edit tracking
+            if 'edit_expense_id' not in st.session_state:
+                st.session_state.edit_expense_id = None
+            if 'expense_updated' not in st.session_state:
+                st.session_state.expense_updated = False
+            
+            # Show success message if expense was just updated
+            if st.session_state.expense_updated:
+                st.success("✅ Expense updated successfully!")
+                st.session_state.expense_updated = False
+            
+            # Display list of expenses to select from
+            st.subheader("Select an expense to edit:")
+            
+            expense_options = []
+            for exp in current_event['expenses']:
+                status = "✓ Settled" if exp.get('settled', False) else "⏳ Pending"
+                expense_options.append(f"{exp['date']} - {exp['title']} (${exp['amount']:.2f}) - {status}")
+            
+            selected_idx = st.selectbox(
+                "Choose expense:",
+                range(len(expense_options)),
+                format_func=lambda x: expense_options[x]
+            )
+            
+            if selected_idx is not None:
+                selected_expense = current_event['expenses'][selected_idx]
+                
+                st.divider()
+                st.subheader("Edit Details:")
+                
+                with st.form("edit_expense_form"):
+                    new_title = st.text_input("Description", value=selected_expense['title'])
+                    new_amount = st.number_input("Amount", min_value=0.01, value=float(selected_expense['amount']))
+                    
+                    # Get current payer index
+                    try:
+                        payer_idx = current_event['members'].index(selected_expense['payer'])
+                    except ValueError:
+                        payer_idx = 0
+                    
+                    new_payer = st.selectbox("Paid By", current_event['members'], index=payer_idx)
+                    
+                    # Get current category index
+                    categories = ["Food", "Transport", "Accommodation", "Entertainment", "Utilities", "Other"]
+                    try:
+                        cat_idx = categories.index(selected_expense['category'])
+                    except ValueError:
+                        cat_idx = 0
+                    
+                    new_category = st.selectbox("Category", categories, index=cat_idx)
+                    
+                    # Handle involved members
+                    current_involved = selected_expense.get('involved', current_event['members'])
+                    new_involved = st.multiselect("Split Among", current_event['members'], default=current_involved)
+                    
+                    # Parse date
+                    try:
+                        current_date = datetime.strptime(selected_expense['date'], '%Y-%m-%d').date()
+                    except:
+                        current_date = datetime.today().date()
+                    
+                    new_date = st.date_input("Date", value=current_date)
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        update_button = st.form_submit_button("💾 Update Expense", type="primary")
+                    with col2:
+                        delete_button = st.form_submit_button("🗑️ Delete Expense", type="secondary")
+                    
+                    if update_button:
+                        if new_title and new_involved:
+                            with st.spinner("Updating expense..."):
+                                # Update the expense
+                                current_event['expenses'][selected_idx] = {
+                                    "id": selected_expense['id'],
+                                    "title": new_title,
+                                    "amount": new_amount,
+                                    "payer": new_payer,
+                                    "involved": new_involved,
+                                    "date": str(new_date),
+                                    "category": new_category,
+                                    "settled": selected_expense.get('settled', False)
+                                }
+                                save_data(data)
+                                st.session_state.data = data
+                                st.session_state.expense_updated = True
+                                st.rerun()
+                        else:
+                            st.error("Please fill all required fields.")
+                    
+                    if delete_button:
+                        with st.spinner("Deleting expense..."):
+                            current_event['expenses'].pop(selected_idx)
+                            save_data(data)
+                            st.session_state.data = data
+                            st.success("Expense deleted successfully!")
+                            st.rerun()
+
 
     # --- Settle Expenses ---
     elif menu == "Settle Expenses":
