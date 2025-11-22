@@ -522,7 +522,15 @@ elif not st.session_state.current_event:
     
     with col1:
         st.markdown("### Create New Event")
-        with st.form("new_event"):
+        # Initialize session state for create event
+        if 'event_created' not in st.session_state:
+            st.session_state.event_created = False
+        
+        if st.session_state.event_created:
+            st.success("✅ Event created successfully!")
+            st.session_state.event_created = False
+        
+        with st.form("new_event", clear_on_submit=True):
             event_name = st.text_input("Event Name", placeholder="e.g. Japan Trip 2024")
             
             # Currency selection
@@ -561,57 +569,71 @@ elif not st.session_state.current_event:
             # Other members can be added by code or manually by name
             members = [st.session_state.current_user]
             
-            if st.form_submit_button("Create Event"):
+            submitted = st.form_submit_button("Create Event", type="primary")
+            
+            if submitted:
                 if event_name:
-                    # Generate unique access code
-                    access_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                    
-                    new_event = {
-                        "id": f"event_{len(data['events']) + 1}",
-                        "name": event_name,
-                        "members": members,
-                        "roles": {st.session_state.current_user: "admin"},  # Creator is admin
-                        "currency": selected_currency,
-                        "expenses": [],
-                        "access_code": access_code
-                    }
-                    data['events'].append(new_event)
-                    save_data(data)
-                    st.session_state.data = data
-                    st.success(f"Event created! Access Code: {access_code}")
-                    st.rerun()
+                    with st.spinner("Creating event..."):
+                        # Generate unique access code
+                        access_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                        
+                        new_event = {
+                            "id": f"event_{len(data['events']) + 1}",
+                            "name": event_name,
+                            "members": members,
+                            "roles": {st.session_state.current_user: "admin"},  # Creator is admin
+                            "currency": selected_currency,
+                            "expenses": [],
+                            "access_code": access_code
+                        }
+                        data['events'].append(new_event)
+                        save_data(data)
+                        st.session_state.data = data
+                        st.session_state.event_created = True
+                        st.rerun()
                 else:
-                    st.error("Please provide a name and select members.")
+                    st.error("Please provide an event name.")
 
     with col2:
         st.markdown("### Join Event")
-        with st.form("join_event"):
+        
+        if 'event_joined' not in st.session_state:
+            st.session_state.event_joined = False
+        
+        if st.session_state.event_joined:
+            st.success("✅ Successfully joined event!")
+            st.session_state.event_joined = False
+        
+        with st.form("join_event", clear_on_submit=True):
             code_input = st.text_input("Enter Access Code", placeholder="e.g. ABC123")
-            if st.form_submit_button("Join"):
+            submitted = st.form_submit_button("Join Event", type="primary")
+            
+            if submitted:
                 if code_input:
-                    # Find event with matching code
-                    matching_event = None
-                    for evt in data['events']:
-                        if evt.get('access_code') == code_input.upper():
-                            matching_event = evt
-                            break
-                    
-                    if matching_event:
-                        if st.session_state.current_user not in matching_event['members']:
-                            matching_event['members'].append(st.session_state.current_user)
-                            # Ensure roles dict exists
-                            if 'roles' not in matching_event:
-                                matching_event['roles'] = {}
-                            # Assign member role
-                            matching_event['roles'][st.session_state.current_user] = "member"
-                            save_data(data)
-                            st.session_state.data = data
-                            st.success(f"Joined {matching_event['name']}!")
-                            st.rerun()
+                    with st.spinner("Joining event..."):
+                        # Find event with matching code
+                        matching_event = None
+                        for evt in data['events']:
+                            if evt.get('access_code') == code_input.upper():
+                                matching_event = evt
+                                break
+                        
+                        if matching_event:
+                            if st.session_state.current_user not in matching_event['members']:
+                                matching_event['members'].append(st.session_state.current_user)
+                                # Ensure roles dict exists
+                                if 'roles' not in matching_event:
+                                    matching_event['roles'] = {}
+                                # Assign member role
+                                matching_event['roles'][st.session_state.current_user] = "member"
+                                save_data(data)
+                                st.session_state.data = data
+                                st.session_state.event_joined = True
+                                st.rerun()
+                            else:
+                                st.info("You are already a member of this event.")
                         else:
-                            st.info("You are already a member of this event.")
-                    else:
-                        st.error("Invalid Access Code.")
+                            st.error("Invalid Access Code.")
                 else:
                     st.error("Please enter an access code.")
 
@@ -1145,9 +1167,19 @@ else:
         
         # Add Member Section
         st.subheader("➕ Add Member to Event")
-        with st.form("add_member_form"):
+        
+        if 'member_added' not in st.session_state:
+            st.session_state.member_added = False
+        
+        if st.session_state.member_added:
+            st.success("✅ Member added successfully!")
+            st.session_state.member_added = False
+        
+        with st.form("add_member_form", clear_on_submit=True):
             new_member_username = st.text_input("Enter Username to Add")
-            if st.form_submit_button("Add Member"):
+            submitted = st.form_submit_button("Add Member", type="primary")
+            
+            if submitted:
                 # Check if user exists
                 user_exists = any(u['username'] == new_member_username for u in data['users'])
                 if not user_exists:
@@ -1155,18 +1187,26 @@ else:
                 elif new_member_username in current_event['members']:
                     st.warning("User already in event.")
                 else:
-                    current_event['members'].append(new_member_username)
-                    # Assign default member role
-                    current_event['roles'][new_member_username] = "member"
-                    save_data(data)
-                    st.session_state.data = data
-                    st.success(f"Added {new_member_username}!")
-                    st.rerun()
+                    with st.spinner("Adding member..."):
+                        current_event['members'].append(new_member_username)
+                        # Assign default member role
+                        current_event['roles'][new_member_username] = "member"
+                        save_data(data)
+                        st.session_state.data = data
+                        st.session_state.member_added = True
+                        st.rerun()
         
         # Role Management Section (Admin Only)
         if is_admin():
             st.divider()
             st.subheader("👑 Manage Roles (Admin Only)")
+            
+            if 'role_updated' not in st.session_state:
+                st.session_state.role_updated = False
+            
+            if st.session_state.role_updated:
+                st.success("✅ Role updated successfully!")
+                st.session_state.role_updated = False
             
             with st.form("role_management_form"):
                 # Get non-admin members
@@ -1179,12 +1219,15 @@ else:
                     new_role = st.radio("Assign Role", ["member", "admin"], 
                                        index=0 if current_role == "member" else 1)
                     
-                    if st.form_submit_button("Update Role"):
-                        current_event['roles'][selected_member] = new_role
-                        save_data(data)
-                        st.session_state.data = data
-                        st.success(f"Updated {selected_member}'s role to {new_role}!")
-                        st.rerun()
+                    submitted = st.form_submit_button("Update Role", type="primary")
+                    
+                    if submitted:
+                        with st.spinner("Updating role..."):
+                            current_event['roles'][selected_member] = new_role
+                            save_data(data)
+                            st.session_state.data = data
+                            st.session_state.role_updated = True
+                            st.rerun()
                 else:
                     st.info("No other members to manage.")
                     st.form_submit_button("Update Role", disabled=True)
@@ -1192,6 +1235,13 @@ else:
             # Currency Management Section (Admin Only)
             st.divider()
             st.subheader("💱 Change Event Currency (Admin Only)")
+            
+            if 'currency_updated' not in st.session_state:
+                st.session_state.currency_updated = False
+            
+            if st.session_state.currency_updated:
+                st.success("✅ Currency updated successfully!")
+                st.session_state.currency_updated = False
             
             currencies = {
                 "USD": "$ (US Dollar)", "EUR": "€ (Euro)", "GBP": "£ (British Pound)",
@@ -1216,13 +1266,16 @@ else:
                 
                 st.caption(f"Current currency: {currencies.get(current_currency, current_currency)}")
                 
-                if st.form_submit_button("Update Currency"):
+                submitted = st.form_submit_button("Update Currency", type="primary")
+                
+                if submitted:
                     if new_currency != current_currency:
-                        current_event['currency'] = new_currency
-                        save_data(data)
-                        st.session_state.data = data
-                        st.success(f"Currency updated to {currencies[new_currency]}!")
-                        st.rerun()
+                        with st.spinner("Updating currency..."):
+                            current_event['currency'] = new_currency
+                            save_data(data)
+                            st.session_state.data = data
+                            st.session_state.currency_updated = True
+                            st.rerun()
                     else:
                         st.info("Currency is already set to this value.")
 
