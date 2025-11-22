@@ -14,6 +14,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import requests
+from PIL import Image
+import base64
+import io
 
 # --- Configuration & Styling ---
 st.set_page_config(
@@ -525,7 +528,18 @@ if not st.session_state.current_user:
 
 # --- Event Selection Screen ---
 elif not st.session_state.current_event:
-    st.sidebar.title(f"👤 {st.session_state.current_user}")
+    # Get user data for avatar
+    current_user_data = next((u for u in data['users'] if u['username'] == st.session_state.current_user), None)
+    
+    if current_user_data and current_user_data.get('avatar'):
+        try:
+            avatar_bytes = base64.b64decode(current_user_data['avatar'])
+            st.sidebar.image(avatar_bytes, width=100)
+            st.sidebar.markdown(f"### {st.session_state.current_user}")
+        except:
+             st.sidebar.title(f"👤 {st.session_state.current_user}")
+    else:
+        st.sidebar.title(f"👤 {st.session_state.current_user}")
     
     # Initialize settings state
     if 'show_settings' not in st.session_state:
@@ -542,6 +556,46 @@ elif not st.session_state.current_event:
     
     if st.session_state.show_settings:
         st.title("⚙️ Account Settings")
+        
+        # Profile Picture Section
+        st.subheader("Profile Picture")
+        col_avatar, col_upload = st.columns([1, 3])
+        
+        current_user_data = next((u for u in data['users'] if u['username'] == st.session_state.current_user), None)
+        
+        with col_avatar:
+            if current_user_data and current_user_data.get('avatar'):
+                try:
+                    st.image(base64.b64decode(current_user_data['avatar']), width=100, caption="Current")
+                except:
+                    st.error("Error loading avatar")
+            else:
+                st.info("No avatar set")
+        
+        with col_upload:
+            uploaded_file = st.file_uploader("Upload new avatar", type=['png', 'jpg', 'jpeg'])
+            if uploaded_file is not None:
+                if st.button("Save Avatar", type="primary"):
+                    try:
+                        image = Image.open(uploaded_file)
+                        # Resize to square 150x150
+                        image = image.resize((150, 150))
+                        # Convert to base64
+                        buffered = io.BytesIO()
+                        image.save(buffered, format="PNG")
+                        img_str = base64.b64encode(buffered.getvalue()).decode()
+                        
+                        # Save
+                        user_idx = next((i for i, u in enumerate(data['users']) if u['username'] == st.session_state.current_user), -1)
+                        if user_idx != -1:
+                            data['users'][user_idx]['avatar'] = img_str
+                            save_data(data)
+                            st.success("✅ Avatar updated!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error processing image: {e}")
+        
+        st.divider()
         
         col1, col2 = st.columns(2)
         
