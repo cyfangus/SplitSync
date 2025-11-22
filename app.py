@@ -1496,6 +1496,35 @@ else:
     elif menu == "Manage Event":
         st.title("Manage Event")
         
+        # Initialize profile view state
+        if 'viewing_profile' not in st.session_state:
+            st.session_state.viewing_profile = None
+            
+        # Profile View
+        if st.session_state.viewing_profile:
+            target_user = st.session_state.viewing_profile
+            user_data = next((u for u in data['users'] if u['username'] == target_user), None)
+            
+            with st.expander(f"👤 Profile: {target_user}", expanded=True):
+                c1, c2 = st.columns([1, 3])
+                with c1:
+                    if user_data and user_data.get('avatar'):
+                        try:
+                            st.image(base64.b64decode(user_data['avatar']), width=100)
+                        except:
+                            st.write("👤")
+                    else:
+                        st.write("👤 No Avatar")
+                with c2:
+                    st.subheader(target_user)
+                    role = current_event.get('roles', {}).get(target_user, 'member')
+                    st.info(f"Role: {role.title()}")
+                
+                if st.button("Close Profile"):
+                    st.session_state.viewing_profile = None
+                    st.rerun()
+            st.divider()
+        
         # Display all members with their roles
         st.subheader("👥 Event Members")
         
@@ -1508,12 +1537,30 @@ else:
             role = current_event['roles'].get(member, 'member')
             role_emoji = "👑" if role == "admin" else "👤"
             
-            col1, col2, col3 = st.columns([3, 2, 2])
+            # Get avatar for list
+            member_data = next((u for u in data['users'] if u['username'] == member), None)
+            
+            col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
+            
             with col1:
-                st.text(f"{role_emoji} {member}")
+                if member_data and member_data.get('avatar'):
+                    try:
+                        st.image(base64.b64decode(member_data['avatar']), width=35)
+                    except:
+                        st.write("👤")
+                else:
+                    st.write("👤")
+            
             with col2:
-                st.caption(f"Role: {role.title()}")
+                st.write(f"**{member}**")
+                st.caption(f"{role.title()}")
+            
             with col3:
+                if st.button("View Profile", key=f"view_{member}"):
+                    st.session_state.viewing_profile = member
+                    st.rerun()
+            
+            with col4:
                 # Only admins can remove members or change roles
                 if is_admin() and member != st.session_state.current_user:
                     if st.button(f"Remove", key=f"remove_{member}"):
