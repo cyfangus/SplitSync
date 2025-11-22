@@ -717,6 +717,19 @@ elif not st.session_state.current_event:
                 form_data['details'] = st.text_area("Details", value=legacy_val, height=100)
 
             if st.button("Save Bank Details"):
+                # Auto-format specific fields
+                if selected_country == "GB":
+                    # Sort Code: XX-XX-XX
+                    sc = form_data.get('sort_code', '').replace('-', '').replace(' ', '')
+                    if len(sc) == 6 and sc.isdigit():
+                        form_data['sort_code'] = f"{sc[:2]}-{sc[2:4]}-{sc[4:]}"
+                
+                elif selected_country == "AU":
+                    # BSB: XXX-XXX
+                    bsb = form_data.get('bsb', '').replace('-', '').replace(' ', '')
+                    if len(bsb) == 6 and bsb.isdigit():
+                        form_data['bsb'] = f"{bsb[:3]}-{bsb[3:]}"
+
                 save_struct = {
                     "country": selected_country,
                     "fields": form_data
