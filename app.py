@@ -651,6 +651,62 @@ elif not st.session_state.current_event:
                         st.info("New username is the same as current.")
                     else:
                         st.error("Please enter a valid username.")
+        
+        st.divider()
+        st.subheader("🏦 Bank Details & Privacy")
+        
+        col_bank, col_requests = st.columns(2)
+        
+        current_user_idx = next((i for i, u in enumerate(data['users']) if u['username'] == st.session_state.current_user), -1)
+        user = data['users'][current_user_idx]
+        
+        with col_bank:
+            st.markdown("**My Bank Information**")
+            st.caption("Shared only with approved users.")
+            current_bank = user.get('bank_details', '')
+            new_bank = st.text_area("Account Details", value=current_bank, height=100, placeholder="Bank Name: ...\nAccount Number: ...")
+            
+            if st.button("Save Bank Details"):
+                user['bank_details'] = new_bank
+                save_data(data)
+                st.success("Saved!")
+                
+        with col_requests:
+            st.markdown("**Access Requests**")
+            
+            # Pending Requests
+            requests = user.get('access_requests', [])
+            if requests:
+                st.info(f"You have {len(requests)} pending requests.")
+                for req_user in requests:
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    c1.write(req_user)
+                    if c2.button("Approve", key=f"app_{req_user}"):
+                        if 'approved_viewers' not in user: user['approved_viewers'] = []
+                        user['approved_viewers'].append(req_user)
+                        user['access_requests'].remove(req_user)
+                        save_data(data)
+                        st.rerun()
+                    if c3.button("Reject", key=f"rej_{req_user}"):
+                        user['access_requests'].remove(req_user)
+                        save_data(data)
+                        st.rerun()
+            else:
+                st.caption("No pending requests.")
+                
+            st.divider()
+            st.markdown("**Approved Users**")
+            approved = user.get('approved_viewers', [])
+            if approved:
+                for app_user in approved:
+                    c1, c2 = st.columns([3, 1])
+                    c1.write(app_user)
+                    if c2.button("Revoke", key=f"rev_{app_user}"):
+                        user['approved_viewers'].remove(app_user)
+                        save_data(data)
+                        st.rerun()
+            else:
+                st.caption("No users have access.")
                         
         if st.button("← Back to Events"):
             st.session_state.show_settings = False
@@ -1519,6 +1575,32 @@ else:
                     st.subheader(target_user)
                     role = current_event.get('roles', {}).get(target_user, 'member')
                     st.info(f"Role: {role.title()}")
+                    
+                    # Bank Details Logic
+                    st.divider()
+                    st.markdown("#### 🏦 Bank Details")
+                    
+                    if target_user == st.session_state.current_user:
+                         st.info("Go to Account Settings to manage your details.")
+                    else:
+                        approved_list = user_data.get('approved_viewers', []) if user_data else []
+                        requests_list = user_data.get('access_requests', []) if user_data else []
+                        
+                        if st.session_state.current_user in approved_list:
+                            details = user_data.get('bank_details', 'No details provided.') if user_data else 'No details.'
+                            st.success("✅ Access Granted")
+                            st.code(details)
+                        elif st.session_state.current_user in requests_list:
+                            st.warning("⏳ Request Pending Approval")
+                        else:
+                            if st.button("🔒 Request Access to Bank Details"):
+                                if user_data:
+                                    if 'access_requests' not in user_data:
+                                        user_data['access_requests'] = []
+                                    user_data['access_requests'].append(st.session_state.current_user)
+                                    save_data(data)
+                                    st.success("Request sent!")
+                                    st.rerun()
                 
                 if st.button("Close Profile"):
                     st.session_state.viewing_profile = None
