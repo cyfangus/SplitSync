@@ -8,8 +8,6 @@ from datetime import datetime
 import random
 import string
 import hashlib
-import gspread
-from google.oauth2.service_account import Credentials
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -68,25 +66,10 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- Data Management ---
-DATA_FILE = "data.json"
+from database import init_db, load_data, save_data
 
-# Google Sheets Configuration
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-def get_gsheet_client():
-    try:
-        if "gcp_service_account" in st.secrets:
-            creds = Credentials.from_service_account_info(
-                st.secrets["gcp_service_account"], scopes=SCOPES
-            )
-            return gspread.authorize(creds)
-        return None
-    except Exception as e:
-        st.error(f"Error connecting to Google Sheets: {e}")
-        return None
+# Initialize database on first run
+init_db()
 
 def send_email(to_email, subject, body):
     if "email" not in st.secrets:
@@ -116,121 +99,6 @@ def send_email(to_email, subject, body):
         st.error(f"Failed to send email: {e}")
         return False
 
-def load_data():
-    client = get_gsheet_client()
-    
-    # Fallback to local if no cloud connection
-    if not client:
-        if not os.path.exists(DATA_FILE):
-            default_data = {"users": [], "events": []}
-            save_local_data(default_data)
-            return default_data
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-
-    try:
-        # Open Spreadsheet (Assumes name 'SplitSync_DB' or uses URL from secrets)
-        sheet_url = st.secrets.get("private_gsheets_url")
-        if sheet_url:
-            sh = client.open_by_url(sheet_url)
-        else:
-            sh = client.open("SplitSync_DB")
-
-        # Load Users
-        try:
-            users_ws = sh.worksheet("Users")
-            users = users_ws.get_all_records()
-        except:
-            users = []
-
-        # Load Events
-        try:
-            events_ws = sh.worksheet("Events")
-            events_raw = events_ws.get_all_records()
-        except:
-            events_raw = []
-
-        # Load Expenses
-        try:
-            expenses_ws = sh.worksheet("Expenses")
-            expenses_raw = expenses_ws.get_all_records()
-        except:
-            expenses_raw = []
-
-        # Reconstruct Data Structure
-        data = {"users": users, "events": []}
-        
-        # Map expenses to events
-        expenses_by_event = {}
-        for exp in expenses_raw:
-            eid = exp['event_id']
-            if eid not in expenses_by_event:
-                expenses_by_event[eid] = []
-            
-            # Parse 'involved' back from string to list
-            if isinstance(exp.get('involved'), str):
-                try:
-                    exp['involved'] = json.loads(exp['involved'])
-                except:
-                    exp['involved'] = []
-            
-            # Ensure 'settled' is boolean
-            settled_val = exp.get('settled', False)
-            if isinstance(settled_val, str):
-                exp['settled'] = settled_val.upper() == 'TRUE'
-            else:
-                exp['settled'] = bool(settled_val)
-            
-            # Remove event_id from expense object to match internal schema
-            del exp['event_id']
-            expenses_by_event[eid].append(exp)
-
-        for evt in events_raw:
-            # Parse 'members' back from string
-            if isinstance(evt.get('members'), str):
-                try:
-                    evt['members'] = json.loads(evt['members'])
-                except:
-                    evt['members'] = []
-            
-            # Parse 'roles' back from string to dict
-            if isinstance(evt.get('roles'), str):
-                try:
-                    evt['roles'] = json.loads(evt['roles'])
-                except:
-                    evt['roles'] = {}
-            elif 'roles' not in evt:
-                evt['roles'] = {}
-            
-            # Parse 'settlements' back from string to list
-            if isinstance(evt.get('settlements'), str):
-                try:
-                    evt['settlements'] = json.loads(evt['settlements'])
-                except:
-                    evt['settlements'] = []
-            elif 'settlements' not in evt:
-                evt['settlements'] = []
-            
-            # Ensure currency field exists
-            if 'currency' not in evt:
-                evt['currency'] = 'USD'
-            
-            evt['expenses'] = expenses_by_event.get(evt['id'], [])
-            data['events'].append(evt)
-
-        return data
-
-    except Exception as e:
-        st.error(f"Failed to load from Cloud: {e}. Using local backup.")
-        if not os.path.exists(DATA_FILE):
-            return {"users": [], "events": []}
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-
-def save_local_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
 def update_username_references(data, old_username, new_username):
     """Updates username references across all events, expenses, and settlements."""
     for event in data['events']:
@@ -252,87 +120,11 @@ def update_username_references(data, old_username, new_username):
         
         # Update settlements
         for sett in event.get('settlements', []):
-            if sett['from_user'] == old_username:
-                sett['from_user'] = new_username
-            if sett['to_user'] == old_username:
-                sett['to_user'] = new_username
+            if sett.get('payer') == old_username:
+                sett['payer'] = new_username
+            if sett.get('recipient') == old_username:
+                sett['recipient'] = new_username
     return data
-
-def save_data(data):
-    client = get_gsheet_client()
-    
-    # Always save local backup
-    save_local_data(data)
-
-    if not client:
-        return
-
-    try:
-        sheet_url = st.secrets.get("private_gsheets_url")
-        if sheet_url:
-            sh = client.open_by_url(sheet_url)
-        else:
-            sh = client.open("SplitSync_DB")
-
-        # Prepare Data for Sheets
-        users_rows = data['users']
-        
-        events_rows = []
-        expenses_rows = []
-        
-        for evt in data['events']:
-            # Clone event to avoid modifying state
-            evt_row = evt.copy()
-            evt_row['members'] = json.dumps(evt_row['members']) # Serialize list
-            evt_row['roles'] = json.dumps(evt_row.get('roles', {})) # Serialize roles dict
-            evt_row['settlements'] = json.dumps(evt_row.get('settlements', [])) # Serialize settlements list
-            del evt_row['expenses'] # Don't store nested expenses in event row
-            events_rows.append(evt_row)
-            
-            for exp in evt['expenses']:
-                exp_row = exp.copy()
-                exp_row['event_id'] = evt['id']
-                exp_row['involved'] = json.dumps(exp_row['involved']) # Serialize list
-                expenses_rows.append(exp_row)
-
-        # Update Users Sheet
-        try:
-            ws = sh.worksheet("Users")
-            ws.clear()
-        except:
-            ws = sh.add_worksheet("Users", 1000, 10)
-        
-        if users_rows:
-            ws.update(range_name='A1', values=[list(users_rows[0].keys())] + [list(r.values()) for r in users_rows])
-        else:
-            ws.update(range_name='A1', values=[["username", "password", "email"]]) # Header only
-
-        # Update Events Sheet
-        try:
-            ws = sh.worksheet("Events")
-            ws.clear()
-        except:
-            ws = sh.add_worksheet("Events", 1000, 10)
-            
-        if events_rows:
-            ws.update(range_name='A1', values=[list(events_rows[0].keys())] + [list(r.values()) for r in events_rows])
-        else:
-            ws.update(range_name='A1', values=[["id", "name", "members", "roles", "currency", "access_code", "settlements"]])
-
-        # Update Expenses Sheet
-        try:
-            ws = sh.worksheet("Expenses")
-            ws.clear()
-        except:
-            ws = sh.add_worksheet("Expenses", 1000, 10)
-            
-        if expenses_rows:
-            ws.update(range_name='A1', values=[list(expenses_rows[0].keys())] + [list(r.values()) for r in expenses_rows])
-        else:
-            ws.update(range_name='A1', values=[["id", "title", "amount", "payer", "involved", "date", "category", "settled", "event_id"]])
-
-    except Exception as e:
-        st.warning(f"Could not sync to Cloud: {e}")
 
 def calculate_debts(expenses, members):
     # Calculate net balances
