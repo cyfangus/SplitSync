@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 import random
 import string
-import hashlib
+import bcrypt
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -17,11 +17,7 @@ import base64
 import io
 import time
 import re
-import extra_streamlit_components as stx
 from datetime import datetime, timedelta
-
-# --- Cookie Manager ---
-cookie_manager = stx.CookieManager(key="auth_cookie_manager")
 
 # --- Configuration & Styling ---
 st.set_page_config(
@@ -178,7 +174,15 @@ def calculate_debts(expenses, members):
     return transactions
 
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash a password using bcrypt."""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password, hashed):
+    """Verify a password against a bcrypt hash."""
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
 
 def validate_password(password):
     if len(password) < 8:
@@ -217,13 +221,6 @@ data = st.session_state.data
 
 # --- Login Screen ---
 if not st.session_state.current_user:
-    # Check for cookie if not logged in
-    cookie_user = cookie_manager.get('current_user')
-    if cookie_user:
-        st.session_state.current_user = cookie_user
-        st.rerun()
-
-if not st.session_state.current_user:
     st.title("👋 Welcome to SplitSync")
     
     tab1, tab2, tab3 = st.tabs(["Login", "Register", "Forgot Password"])
@@ -232,18 +229,12 @@ if not st.session_state.current_user:
         st.markdown("Please login to continue.")
         username_input = st.text_input("Username")
         password_input = st.text_input("Password", type="password")
-        remember_me = st.checkbox("Remember me for 30 days")
         
         if st.button("Login", type="primary"):
             user_found = False
             for user in data.get('users', []):
-                if user['username'] == username_input and user['password'] == hash_password(password_input):
+                if user['username'] == username_input and verify_password(password_input, user['password']):
                     st.session_state.current_user = user['username']
-                    
-                    if remember_me:
-                        cookie_manager.set('current_user', user['username'], expires_at=datetime.now() + timedelta(days=30))
-                    
-                    time.sleep(1)
                     st.rerun()
                     break
             
@@ -396,8 +387,6 @@ elif not st.session_state.current_event:
     if st.sidebar.button("Logout"):
         st.session_state.current_user = None
         st.session_state.show_settings = False
-        cookie_manager.delete('current_user')
-        time.sleep(1)
         st.rerun()
     
     if st.session_state.show_settings:
@@ -457,7 +446,7 @@ elif not st.session_state.current_event:
                     user_idx = next((i for i, u in enumerate(data['users']) if u['username'] == st.session_state.current_user), -1)
                     if user_idx != -1:
                         user = data['users'][user_idx]
-                        if user['password'] == hash_password(current_pwd):
+                        if verify_password(current_pwd, user['password']):
                             if new_pwd == confirm_pwd:
                                 is_valid_pass, pass_err = validate_password(new_pwd)
                                 if is_valid_pass:
