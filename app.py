@@ -462,9 +462,9 @@ if not st.session_state.current_user:
         st.markdown("Create a new account.")
         if st.session_state.reg_step == 1:
             with st.form("reg_form_1"):
-                new_username = st.text_input("Choose Username")
+                new_username = st.text_input("Choose Username", help="Min 3 chars. Letters, numbers, and underscores only. No spaces.")
                 new_email = st.text_input("Email Address")
-                new_password = st.text_input("Choose Password", type="password")
+                new_password = st.text_input("Choose Password", type="password", help="Min 8 chars. Must include uppercase, lowercase, number, and special char.")
                 confirm_password = st.text_input("Confirm Password", type="password")
                 
                 if st.form_submit_button("Next: Verify Email"):
@@ -545,7 +545,7 @@ if not st.session_state.current_user:
         elif st.session_state.reset_step == 2:
             st.info(f"Reset code sent to {st.session_state.reset_email}")
             reset_code_input = st.text_input("Enter Reset Code")
-            new_pass = st.text_input("New Password", type="password")
+            new_pass = st.text_input("New Password", type="password", help="Min 8 chars. Must include uppercase, lowercase, number, and special char.")
             
             if st.button("Reset Password"):
                 is_valid_pass, pass_err = validate_password(new_pass)
@@ -654,7 +654,7 @@ elif not st.session_state.current_event:
             st.subheader("Change Password")
             with st.form("change_password"):
                 current_pwd = st.text_input("Current Password", type="password")
-                new_pwd = st.text_input("New Password", type="password")
+                new_pwd = st.text_input("New Password", type="password", help="Min 8 chars. Must include uppercase, lowercase, number, and special char.")
                 confirm_pwd = st.text_input("Confirm New Password", type="password")
                 
                 if st.form_submit_button("Update Password", type="primary"):
@@ -679,7 +679,7 @@ elif not st.session_state.current_event:
             st.subheader("Change Username")
             st.warning("⚠️ Changing your username will update it across all past events and expenses.")
             with st.form("change_username"):
-                new_username = st.text_input("New Username")
+                new_username = st.text_input("New Username", help="Min 3 chars. Letters, numbers, and underscores only. No spaces.")
                 
                 if st.form_submit_button("Update Username", type="primary"):
                     if new_username and new_username != st.session_state.current_user:
