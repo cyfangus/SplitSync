@@ -219,6 +219,15 @@ if 'reset_email' not in st.session_state:
 
 data = st.session_state.data
 
+# --- Auto-login from query params ---
+if not st.session_state.current_user:
+    query_params = st.query_params
+    if 'user' in query_params:
+        username_from_url = query_params['user']
+        # Verify user exists in database
+        if any(u['username'] == username_from_url for u in data.get('users', [])):
+            st.session_state.current_user = username_from_url
+
 # --- Login Screen ---
 if not st.session_state.current_user:
     st.title("👋 Welcome to SplitSync")
@@ -235,6 +244,8 @@ if not st.session_state.current_user:
             for user in data.get('users', []):
                 if user['username'] == username_input and verify_password(password_input, user['password']):
                     st.session_state.current_user = user['username']
+                    # Set query param for persistent login
+                    st.query_params['user'] = user['username']
                     st.rerun()
                     break
             
@@ -310,17 +321,30 @@ if not st.session_state.current_user:
             reset_email = st.text_input("Enter your registered email")
             if st.button("Send Reset Code"):
                 user_exists = False
+                username_for_email = None
                 for u in data['users']:
                     if u.get('email') == reset_email:
                         user_exists = True
+                        username_for_email = u['username']
                         break
                 
                 if user_exists:
                     code = ''.join(random.choices(string.digits, k=6))
-                    if send_email(reset_email, "SplitSync Password Reset", f"Your reset code is: {code}"):
+                    email_body = f"""Hello,
+
+Your username is: {username_for_email}
+
+Your password reset code is: {code}
+
+Enter this code in the app to reset your password.
+
+If you didn't request this, please ignore this email.
+"""
+                    if send_email(reset_email, "SplitSync Password Reset", email_body):
                         st.session_state.reset_code = code
                         st.session_state.reset_email = reset_email
                         st.session_state.reset_step = 2
+                        st.success(f"✅ Reset code sent! Your username is: **{username_for_email}**")
                         st.rerun()
                     else:
                         st.error("Failed to send email.")
@@ -387,6 +411,8 @@ elif not st.session_state.current_event:
     if st.sidebar.button("Logout"):
         st.session_state.current_user = None
         st.session_state.show_settings = False
+        # Clear query param
+        st.query_params.clear()
         st.rerun()
     
     if st.session_state.show_settings:
