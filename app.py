@@ -17,6 +17,11 @@ import requests
 from PIL import Image
 import base64
 import io
+import extra_streamlit_components as stx
+from datetime import datetime, timedelta
+
+# --- Cookie Manager ---
+cookie_manager = stx.CookieManager()
 
 # --- Configuration & Styling ---
 st.set_page_config(
@@ -405,6 +410,13 @@ data = st.session_state.data
 
 # --- Login Screen ---
 if not st.session_state.current_user:
+    # Check for cookie if not logged in
+    cookie_user = cookie_manager.get('current_user')
+    if cookie_user:
+        st.session_state.current_user = cookie_user
+        st.rerun()
+
+if not st.session_state.current_user:
     st.title("👋 Welcome to SplitSync")
     
     tab1, tab2, tab3 = st.tabs(["Login", "Register", "Forgot Password"])
@@ -419,6 +431,7 @@ if not st.session_state.current_user:
             for user in data.get('users', []):
                 if user['username'] == username_input and user['password'] == hash_password(password_input):
                     st.session_state.current_user = user['username']
+                    cookie_manager.set('current_user', user['username'], expires_at=datetime.now() + timedelta(days=30))
                     user_found = True
                     st.rerun()
                     break
@@ -556,6 +569,7 @@ elif not st.session_state.current_event:
     if st.sidebar.button("Logout"):
         st.session_state.current_user = None
         st.session_state.show_settings = False
+        cookie_manager.delete('current_user')
         st.rerun()
     
     if st.session_state.show_settings:
