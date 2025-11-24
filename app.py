@@ -217,7 +217,8 @@ if 'reset_code' not in st.session_state:
 if 'reset_email' not in st.session_state:
     st.session_state.reset_email = None
 
-data = st.session_state.data
+# Reload data with current user context for security
+data = st.session_state.data = load_data(current_user=st.session_state.get('current_user'))
 
 # --- Auto-login from query params ---
 if not st.session_state.current_user:

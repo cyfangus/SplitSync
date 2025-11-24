@@ -24,36 +24,65 @@ def init_db():
     # Optional: Simple health check
     # supabase.table('users').select("count", count='exact').execute()
 
-def load_data():
-    """Load all data from Supabase and reconstruct the app's expected structure."""
+def load_data(current_user=None):
+    """Load all data from Supabase and reconstruct the app's expected structure.
+    
+    Args:
+        current_user: Username of the logged-in user. If provided, only loads their events.
+    """
     supabase = init_connection()
     if not supabase:
         return {'users': [], 'events': []}
 
     try:
-        # 1. Load Users
-        response = supabase.table('users').select("*").execute()
+        # 1. Load Users (needed for lookups, but filter sensitive data)
+        response = supabase.table('users').select("username, email, avatar").execute()
         users = response.data
 
-        # 2. Load Events
-        response = supabase.table('events').select("*").execute()
-        events_raw = response.data
+        # 2. Load Events - Filter by current user if logged in
+        if current_user:
+            # First, get event IDs where user is a member
+            response = supabase.table('event_members').select("event_id").eq('username', current_user).execute()
+            user_event_ids = [m['event_id'] for m in response.data]
+            
+            if user_event_ids:
+                # Load only events the user is a member of
+                response = supabase.table('events').select("*").in_('id', user_event_ids).execute()
+                events_raw = response.data
+            else:
+                events_raw = []
+        else:
+            # Not logged in, return empty events
+            events_raw = []
 
-        # 3. Load Event Members
-        response = supabase.table('event_members').select("*").execute()
-        members_raw = response.data
+        # 3. Load Event Members (only for user's events)
+        if current_user and user_event_ids:
+            response = supabase.table('event_members').select("*").in_('event_id', user_event_ids).execute()
+            members_raw = response.data
+        else:
+            members_raw = []
 
-        # 4. Load Expenses
-        response = supabase.table('expenses').select("*").execute()
-        expenses_raw = response.data
+        # 4. Load Expenses (only for user's events)
+        if current_user and user_event_ids:
+            response = supabase.table('expenses').select("*").in_('event_id', user_event_ids).execute()
+            expenses_raw = response.data
+        else:
+            expenses_raw = []
 
-        # 5. Load Expense Participants
-        response = supabase.table('expense_participants').select("*").execute()
-        participants_raw = response.data
+        # 5. Load Expense Participants (only for user's events)
+        if expenses_raw:
+            expense_ids = [e['id'] for e in expenses_raw]
+            response = supabase.table('expense_participants').select("*").in_('expense_id', expense_ids).execute()
+            participants_raw = response.data
+        else:
+            participants_raw = []
 
-        # 6. Load Settlements
-        response = supabase.table('settlements').select("*").execute()
-        settlements_raw = response.data
+        # 6. Load Settlements (only for user's events)
+        if current_user and user_event_ids:
+            response = supabase.table('settlements').select("*").in_('event_id', user_event_ids).execute()
+            settlements_raw = response.data
+        else:
+            settlements_raw = []
 
         # --- Reconstruct Data Structure ---
         
