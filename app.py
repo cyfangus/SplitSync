@@ -17,11 +17,12 @@ import requests
 from PIL import Image
 import base64
 import io
+import time
 import extra_streamlit_components as stx
 from datetime import datetime, timedelta
 
 # --- Cookie Manager ---
-cookie_manager = stx.CookieManager()
+cookie_manager = stx.CookieManager(key="auth_cookie_manager")
 
 # --- Configuration & Styling ---
 st.set_page_config(
@@ -432,7 +433,7 @@ if not st.session_state.current_user:
                 if user['username'] == username_input and user['password'] == hash_password(password_input):
                     st.session_state.current_user = user['username']
                     cookie_manager.set('current_user', user['username'], expires_at=datetime.now() + timedelta(days=30))
-                    user_found = True
+                    time.sleep(1)
                     st.rerun()
                     break
             
@@ -570,6 +571,7 @@ elif not st.session_state.current_event:
         st.session_state.current_user = None
         st.session_state.show_settings = False
         cookie_manager.delete('current_user')
+        time.sleep(1)
         st.rerun()
     
     if st.session_state.show_settings:
