@@ -18,6 +18,7 @@ from PIL import Image
 import base64
 import io
 import time
+import re
 import extra_streamlit_components as stx
 from datetime import datetime, timedelta
 
@@ -387,6 +388,19 @@ def calculate_debts(expenses, members):
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+def validate_password(password):
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
+    if not re.search(r"[0-9]", password):
+        return False, "Password must contain at least one number."
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character."
+    return True, ""
+
 # --- Session State Initialization ---
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
@@ -455,8 +469,16 @@ if not st.session_state.current_user:
                 
                 if st.form_submit_button("Next: Verify Email"):
                     if new_username and new_email and new_password:
+                        is_valid_pass, pass_err = validate_password(new_password)
+                        
                         if new_password != confirm_password:
                             st.error("Passwords do not match.")
+                        elif not is_valid_pass:
+                            st.error(pass_err)
+                        elif not re.match(r"^[a-zA-Z0-9_]+$", new_username):
+                            st.error("Username can only contain letters, numbers, and underscores (no spaces).")
+                        elif len(new_username) < 3:
+                            st.error("Username must be at least 3 characters long.")
                         elif any(u['username'] == new_username for u in data['users']):
                             st.warning("Username already exists.")
                         elif any(u.get('email') == new_email for u in data['users']):
@@ -526,7 +548,12 @@ if not st.session_state.current_user:
             new_pass = st.text_input("New Password", type="password")
             
             if st.button("Reset Password"):
+                is_valid_pass, pass_err = validate_password(new_pass)
+                
                 if reset_code_input == st.session_state.reset_code:
+                    if not is_valid_pass:
+                        st.error(pass_err)
+                    else:
                     # Update password
                     for u in data['users']:
                         if u.get('email') == st.session_state.reset_email:
@@ -636,12 +663,13 @@ elif not st.session_state.current_event:
                         user = data['users'][user_idx]
                         if user['password'] == hash_password(current_pwd):
                             if new_pwd == confirm_pwd:
-                                if len(new_pwd) >= 6:
+                                is_valid_pass, pass_err = validate_password(new_pwd)
+                                if is_valid_pass:
                                     data['users'][user_idx]['password'] = hash_password(new_pwd)
                                     save_data(data)
                                     st.success("✅ Password updated successfully!")
                                 else:
-                                    st.error("Password must be at least 6 characters.")
+                                    st.error(pass_err)
                             else:
                                 st.error("New passwords do not match.")
                         else:
@@ -655,7 +683,11 @@ elif not st.session_state.current_event:
                 
                 if st.form_submit_button("Update Username", type="primary"):
                     if new_username and new_username != st.session_state.current_user:
-                        if any(u['username'] == new_username for u in data['users']):
+                        if not re.match(r"^[a-zA-Z0-9_]+$", new_username):
+                            st.error("Username can only contain letters, numbers, and underscores (no spaces).")
+                        elif len(new_username) < 3:
+                            st.error("Username must be at least 3 characters long.")
+                        elif any(u['username'] == new_username for u in data['users']):
                             st.error("Username already taken.")
                         else:
                             user_idx = next((i for i, u in enumerate(data['users']) if u['username'] == st.session_state.current_user), -1)
