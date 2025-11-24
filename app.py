@@ -554,17 +554,17 @@ if not st.session_state.current_user:
                     if not is_valid_pass:
                         st.error(pass_err)
                     else:
-                    # Update password
-                    for u in data['users']:
-                        if u.get('email') == st.session_state.reset_email:
-                            u['password'] = hash_password(new_pass)
-                            break
-                    save_data(data)
-                    st.session_state.data = data
-                    st.success("Password reset successful! Please login.")
-                    st.session_state.reset_step = 1
-                    st.session_state.reset_code = None
-                    st.session_state.reset_email = None
+                        # Update password
+                        for u in data['users']:
+                            if u.get('email') == st.session_state.reset_email:
+                                u['password'] = hash_password(new_pass)
+                                break
+                        save_data(data)
+                        st.session_state.data = data
+                        st.success("Password reset successful! Please login.")
+                        st.session_state.reset_step = 1
+                        st.session_state.reset_code = None
+                        st.session_state.reset_email = None
                 else:
                     st.error("Invalid code.")
             if st.button("Cancel"):
