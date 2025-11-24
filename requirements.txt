@@ -3,5 +3,5 @@ pandas
 plotly
 requests
 Pillow
-extra-streamlit-components
 supabase
+bcrypt
