@@ -1,8 +1,6 @@
 streamlit
 pandas
 plotly
-gspread
-google-auth
 requests
 Pillow
 extra-streamlit-components
