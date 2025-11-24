@@ -241,17 +241,30 @@ if not st.session_state.current_user:
         password_input = st.text_input("Password", type="password")
         
         if st.button("Login", type="primary"):
-            user_found = False
-            for user in data.get('users', []):
-                if user['username'] == username_input and verify_password(password_input, user['password']):
-                    st.session_state.current_user = user['username']
-                    # Set query param for persistent login
-                    st.query_params['user'] = user['username']
-                    st.rerun()
-                    break
+            # Query Supabase directly for password verification
+            from database import init_connection
+            supabase = init_connection()
             
-            if not user_found:
-                st.error("Invalid username or password.")
+            if supabase:
+                try:
+                    # Fetch user with password for verification
+                    response = supabase.table('users').select("username, password").eq('username', username_input).execute()
+                    
+                    if response.data and len(response.data) > 0:
+                        user = response.data[0]
+                        if verify_password(password_input, user['password']):
+                            st.session_state.current_user = user['username']
+                            # Set query param for persistent login
+                            st.query_params['user'] = user['username']
+                            st.rerun()
+                        else:
+                            st.error("Invalid username or password.")
+                    else:
+                        st.error("Invalid username or password.")
+                except Exception as e:
+                    st.error(f"Login error: {e}")
+            else:
+                st.error("Database connection error.")
 
     with tab2:
         st.markdown("Create a new account.")
@@ -470,22 +483,34 @@ elif not st.session_state.current_event:
                 confirm_pwd = st.text_input("Confirm New Password", type="password")
                 
                 if st.form_submit_button("Update Password", type="primary"):
-                    user_idx = next((i for i, u in enumerate(data['users']) if u['username'] == st.session_state.current_user), -1)
-                    if user_idx != -1:
-                        user = data['users'][user_idx]
-                        if verify_password(current_pwd, user['password']):
-                            if new_pwd == confirm_pwd:
-                                is_valid_pass, pass_err = validate_password(new_pwd)
-                                if is_valid_pass:
-                                    data['users'][user_idx]['password'] = hash_password(new_pwd)
-                                    save_data(data)
-                                    st.success("✅ Password updated successfully!")
+                    # Query Supabase directly for password verification
+                    from database import init_connection
+                    supabase = init_connection()
+                    
+                    if supabase:
+                        try:
+                            # Fetch current password hash
+                            response = supabase.table('users').select("password").eq('username', st.session_state.current_user).execute()
+                            
+                            if response.data and len(response.data) > 0:
+                                current_hash = response.data[0]['password']
+                                
+                                if verify_password(current_pwd, current_hash):
+                                    if new_pwd == confirm_pwd:
+                                        is_valid_pass, pass_err = validate_password(new_pwd)
+                                        if is_valid_pass:
+                                            # Update password in Supabase
+                                            new_hash = hash_password(new_pwd)
+                                            supabase.table('users').update({'password': new_hash}).eq('username', st.session_state.current_user).execute()
+                                            st.success("✅ Password updated successfully!")
+                                        else:
+                                            st.error(pass_err)
+                                    else:
+                                        st.error("New passwords do not match.")
                                 else:
-                                    st.error(pass_err)
-                            else:
-                                st.error("New passwords do not match.")
-                        else:
-                            st.error("Incorrect current password.")
+                                    st.error("Incorrect current password.")
+                        except Exception as e:
+                            st.error(f"Error updating password: {e}")
         
         with col2:
             st.subheader("Change Username")
