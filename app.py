@@ -426,13 +426,17 @@ if not st.session_state.current_user:
         st.markdown("Please login to continue.")
         username_input = st.text_input("Username")
         password_input = st.text_input("Password", type="password")
+        remember_me = st.checkbox("Remember me for 30 days")
         
         if st.button("Login", type="primary"):
             user_found = False
             for user in data.get('users', []):
                 if user['username'] == username_input and user['password'] == hash_password(password_input):
                     st.session_state.current_user = user['username']
-                    cookie_manager.set('current_user', user['username'], expires_at=datetime.now() + timedelta(days=30))
+                    
+                    if remember_me:
+                        cookie_manager.set('current_user', user['username'], expires_at=datetime.now() + timedelta(days=30))
+                    
                     time.sleep(1)
                     st.rerun()
                     break
