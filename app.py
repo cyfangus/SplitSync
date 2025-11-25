@@ -315,14 +315,16 @@ if not st.session_state.current_user:
             code_input = st.text_input("Enter Verification Code")
             if st.button("Verify & Register"):
                 if code_input == st.session_state.reg_code:
-                    data['users'].append(st.session_state.reg_data)
-                    save_data(data)
-                    st.session_state.data = data
-                    st.success(f"User {st.session_state.reg_data['username']} registered! Please login.")
-                    # Reset state
-                    st.session_state.reg_step = 1
-                    st.session_state.reg_code = None
-                    st.session_state.reg_data = {}
+                    # Use register_user instead of save_data
+                    from database import register_user
+                    if register_user(st.session_state.reg_data):
+                        st.success(f"✅ User {st.session_state.reg_data['username']} registered! Please login.")
+                        # Reset state
+                        st.session_state.reg_step = 1
+                        st.session_state.reg_code = None
+                        st.session_state.reg_data = {}
+                    else:
+                        st.error("❌ Registration failed. Please try again.")
                 else:
                     st.error("Invalid code.")
             if st.button("Back"):
@@ -378,17 +380,23 @@ If you didn't request this, please ignore this email.
                     if not is_valid_pass:
                         st.error(pass_err)
                     else:
-                        # Update password
-                        for u in data['users']:
-                            if u.get('email') == st.session_state.reset_email:
-                                u['password'] = hash_password(new_pass)
-                                break
-                        save_data(data)
-                        st.session_state.data = data
-                        st.success("Password reset successful! Please login.")
-                        st.session_state.reset_step = 1
-                        st.session_state.reset_code = None
-                        st.session_state.reset_email = None
+                        # Update password directly in Supabase
+                        from database import init_connection
+                        supabase = init_connection()
+                        if supabase:
+                            try:
+                                # Find username by email
+                                response = supabase.table('users').select("username").eq('email', st.session_state.reset_email).execute()
+                                if response.data:
+                                    username = response.data[0]['username']
+                                    new_hash = hash_password(new_pass)
+                                    supabase.table('users').update({'password': new_hash}).eq('username', username).execute()
+                                    st.success("✅ Password reset successful! Please login.")
+                                    st.session_state.reset_step = 1
+                                    st.session_state.reset_code = None
+                                    st.session_state.reset_email = None
+                            except Exception as e:
+                                st.error(f"Error resetting password: {e}")
                 else:
                     st.error("Invalid code.")
             if st.button("Cancel"):
