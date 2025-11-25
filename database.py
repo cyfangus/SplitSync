@@ -182,6 +182,7 @@ def create_event(event_data):
             return False
         
         # Insert event members
+        members_inserted = 0
         for member in event_data.get('members', []):
             role = event_data.get('roles', {}).get(member, 'member')
             member_insert = {
@@ -189,7 +190,18 @@ def create_event(event_data):
                 'username': member,
                 'role': role
             }
-            supabase.table('event_members').insert(member_insert).execute()
+            try:
+                member_response = supabase.table('event_members').insert(member_insert).execute()
+                if member_response.data:
+                    members_inserted += 1
+                else:
+                    st.warning(f"⚠️ Failed to add member {member} to event")
+            except Exception as member_error:
+                st.error(f"❌ Error adding member {member}: {str(member_error)}")
+        
+        if members_inserted == 0:
+            st.error("❌ Event created but no members were added. This will cause the event to not appear in your list.")
+            return False
         
         return True
     except Exception as e:
