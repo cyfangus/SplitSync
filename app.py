@@ -266,6 +266,8 @@ if not st.session_state.current_user:
                                 st.session_state.current_user = user['username']
                                 # Set query param for persistent login
                                 st.query_params['user'] = user['username']
+                                # Clear cache to load fresh data for the logged-in user
+                                load_data.clear()
                                 time.sleep(0.5)  # Brief pause to show success message
                                 st.rerun()
                             else:
@@ -440,6 +442,7 @@ elif not st.session_state.current_event:
     
     if st.sidebar.button("🏠 My Events"):
         st.session_state.show_settings = False
+        load_data.clear()  # Clear cache to show fresh events
         st.rerun()
 
     if st.sidebar.button("⚙️ Account Settings"):
