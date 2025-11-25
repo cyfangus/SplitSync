@@ -332,11 +332,6 @@ if not st.session_state.current_user:
                                 st.session_state.data = load_data(current_user=user['username'])
                                 # Show events automatically after login
                                 st.session_state.show_events = True
-                                # ---- Handle a pending invite if present ----
-                                if st.session_state.get('pending_invite'):
-                                    pending = st.session_state.pop('pending_invite')
-                                    with st.spinner("🔗 Processing pending invite..."):
-                                        _process_invite(pending, user['username'])
                                 time.sleep(0.5)  # Brief pause to show success message
                                 st.rerun()
                             else:
@@ -348,7 +343,6 @@ if not st.session_state.current_user:
                 else:
                     st.error("Database connection error.")
 
-# -------------------------------------------------
     with tab2:
         st.markdown("Create a new account.")
         if st.session_state.reg_step == 1:
@@ -490,6 +484,13 @@ If you didn't request this, please ignore this email.
             if st.button("Cancel"):
                 st.session_state.reset_step = 1
                 st.rerun()
+
+# Process pending invite after successful login
+if st.session_state.get('current_user') and st.session_state.get('pending_invite'):
+    pending = st.session_state.pop('pending_invite')
+    with st.spinner("🔗 Processing pending invite..."):
+        _process_invite(pending, st.session_state.current_user)
+    st.rerun()  # Rerun to show the updated event list
 
 # --- Event Selection Screen ---
 elif not st.session_state.current_event:
