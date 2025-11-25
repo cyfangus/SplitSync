@@ -501,6 +501,7 @@ elif not st.session_state.current_event:
     
     if st.sidebar.button("🏠 My Events"):
         st.session_state.show_settings = False
+        st.session_state.show_events = True  # Show events list
         load_data.clear()  # Clear cache to show fresh events
         st.rerun()
 
@@ -646,27 +647,95 @@ elif not st.session_state.current_event:
             
         st.stop()
 
-    st.title("Your Events")
+    # Initialize show_events state
+    if 'show_events' not in st.session_state:
+        st.session_state.show_events = False
     
-    # Filter events where current user is a member
-    my_events = [e for e in data.get('events', []) if st.session_state.current_user in e['members']]
-    
-    if my_events:
-        for event in my_events:
-            with st.container():
-                c1, c2 = st.columns([3, 1])
-                with c1:
-                    st.subheader(event['name'])
-                    st.caption(f"Members: {', '.join(event['members'])}")
-                with c2:
-                    if st.button("Open", key=f"open_{event['id']}"):
-                        st.session_state.current_event = event
-                        st.rerun()
-                st.divider()
-    else:
-        st.info("You are not part of any events yet.")
+    # Main Landing Page or Events List
+    if not st.session_state.show_events:
+        # Landing Page
+        st.title("Welcome to SplitSync! 👋")
         
-    st.divider()
+        st.markdown("""
+        ### Your Smart Expense Sharing Companion
+        
+        Track shared expenses, split bills fairly, and settle up with friends - all in one place.
+        """)
+        
+        # Quick stats
+        my_events = [e for e in data.get('events', []) if st.session_state.current_user in e['members']]
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Your Events", len(my_events))
+        with col2:
+            total_expenses = sum(len(e.get('expenses', [])) for e in my_events)
+            st.metric("Total Expenses", total_expenses)
+        with col3:
+            st.metric("Active", len([e for e in my_events if len(e.get('expenses', [])) > 0]))
+        
+        st.divider()
+        
+        # Action buttons
+        st.subheader("What would you like to do?")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📊 View My Events", type="primary", use_container_width=True):
+                st.session_state.show_events = True
+                st.rerun()
+            st.caption("See all your events and manage expenses")
+        
+        with col2:
+            if st.button("➕ Create New Event", type="secondary", use_container_width=True):
+                st.session_state.show_events = True
+                st.rerun()
+            st.caption("Start a new expense sharing event")
+        
+        st.divider()
+        
+        # Recent activity (if any)
+        if my_events:
+            st.subheader("Recent Activity")
+            recent_event = my_events[0]  # Show most recent
+            with st.container():
+                st.markdown(f"**{recent_event['name']}**")
+                st.caption(f"Members: {', '.join(recent_event['members'][:3])}" + 
+                          (f" +{len(recent_event['members'])-3} more" if len(recent_event['members']) > 3 else ""))
+                if st.button("Open", key="open_recent"):
+                    st.session_state.current_event = recent_event
+                    st.rerun()
+    
+    else:
+        # Events List Page
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            if st.button("← Home"):
+                st.session_state.show_events = False
+                st.rerun()
+        with col2:
+            st.title("Your Events")
+        
+        # Filter events where current user is a member
+        my_events = [e for e in data.get('events', []) if st.session_state.current_user in e['members']]
+        
+        if my_events:
+            for event in my_events:
+                with st.container():
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        st.subheader(event['name'])
+                        st.caption(f"Members: {', '.join(event['members'])}")
+                    with c2:
+                        if st.button("Open", key=f"open_{event['id']}"):
+                            st.session_state.current_event = event
+                            st.rerun()
+                    st.divider()
+        else:
+            st.info("You are not part of any events yet.")
+            
+        st.divider()
     
     col1, col2 = st.columns(2)
     
