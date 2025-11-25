@@ -411,3 +411,63 @@ def save_data(data):
     """DEPRECATED: Use specific CRUD functions instead."""
     st.warning("⚠️ save_data() is deprecated")
     return False
+
+# --- Telegram Bot Support ---
+
+def link_telegram_user(username, telegram_id):
+    """Links a Telegram ID to a SplitSync user."""
+    supabase = init_connection()
+    if not supabase: return False
+    
+    try:
+        # Check if user exists
+        response = supabase.table('users').select("username").eq('username', username).execute()
+        if not response.data:
+            return False
+            
+        # Update user with telegram_id
+        # Note: This requires a 'telegram_id' column in the users table
+        supabase.table('users').update({'telegram_id': str(telegram_id)}).eq('username', username).execute()
+        return True
+    except Exception as e:
+        print(f"Error linking telegram user: {e}")
+        return False
+
+def get_user_by_telegram_id(telegram_id):
+    """Finds the SplitSync user associated with a Telegram ID."""
+    supabase = init_connection()
+    if not supabase: return None
+    
+    try:
+        response = supabase.table('users').select("username").eq('telegram_id', str(telegram_id)).execute()
+        if response.data:
+            return response.data[0]['username']
+        return None
+    except Exception as e:
+        print(f"Error fetching user by telegram id: {e}")
+        return None
+
+def get_user_current_event(username):
+    """Gets the most recently accessed event for a user (simplified for bot)."""
+    # For the bot, we'll just pick the first event they are a member of for now
+    # In a real app, we might store 'last_accessed_event' in the DB
+    supabase = init_connection()
+    if not supabase: return None
+    
+    try:
+        # Get events user is a member of
+        response = supabase.table('event_members').select("event_id").eq('username', username).execute()
+        if not response.data:
+            return None
+            
+        # Just pick the first one
+        event_id = response.data[0]['event_id']
+        
+        # Get event details
+        event_response = supabase.table('events').select("*").eq('id', event_id).execute()
+        if event_response.data:
+            return event_response.data[0]
+        return None
+    except Exception as e:
+        print(f"Error fetching user event: {e}")
+        return None
