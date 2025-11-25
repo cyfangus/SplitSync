@@ -62,7 +62,14 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- Data Management ---
-from database import init_db, load_data, save_data
+# --- Data Management ---
+from database import (
+    init_db, load_data, save_data, 
+    register_user, create_event, add_expense, 
+    add_event_member, get_event_by_access_code,
+    update_user, update_username_references_in_db,
+    get_user_by_username, init_connection
+)
 
 # Initialize database on first run
 init_db()
@@ -242,7 +249,6 @@ if not st.session_state.current_user:
         
         if st.button("Login", type="primary"):
             # Query Supabase directly for password verification
-            from database import init_connection
             supabase = init_connection()
             
             if supabase:
@@ -316,7 +322,7 @@ if not st.session_state.current_user:
             if st.button("Verify & Register"):
                 if code_input == st.session_state.reg_code:
                     # Use register_user instead of save_data
-                    from database import register_user
+                    # register_user imported at top
                     if register_user(st.session_state.reg_data):
                         st.success(f"✅ User {st.session_state.reg_data['username']} registered! Please login.")
                         # Reset state
@@ -381,7 +387,7 @@ If you didn't request this, please ignore this email.
                         st.error(pass_err)
                     else:
                         # Update password directly in Supabase
-                        from database import init_connection
+                        # init_connection imported at top
                         supabase = init_connection()
                         if supabase:
                             try:
@@ -469,7 +475,7 @@ elif not st.session_state.current_event:
                         img_str = base64.b64encode(buffered.getvalue()).decode()
                         
                         # Save
-                        from database import update_user
+                        # update_user imported at top
                         if update_user(st.session_state.current_user, {'avatar': img_str}):
                             st.success("✅ Avatar updated!")
                             st.rerun()
@@ -492,7 +498,7 @@ elif not st.session_state.current_event:
                 
                 if st.form_submit_button("Update Password", type="primary"):
                     # Query Supabase directly for password verification
-                    from database import init_connection
+                    # init_connection imported at top
                     supabase = init_connection()
                     
                     if supabase:
@@ -535,7 +541,8 @@ elif not st.session_state.current_event:
                             st.error("Username must be at least 3 characters long.")
                         else:
                             # Update username in database
-                            from database import update_user, get_user_by_username, update_username_references_in_db
+                            # functions imported at top
+                            
                             
                             existing_user = get_user_by_username(new_username)
                             if existing_user:
@@ -664,7 +671,7 @@ elif not st.session_state.current_event:
                         }
                         
                         # Use create_event instead of save_data
-                        from database import create_event
+                        # create_event imported at top
                         if create_event(new_event):
                             st.success(f"✅ Event '{event_name}' created! Access code: **{access_code}**")
                             st.info("Refresh the page to see your new event.")
@@ -692,13 +699,13 @@ elif not st.session_state.current_event:
                     with st.spinner("Joining event..."):
                         # Find event with matching code
                         matching_event = None
-                        from database import get_event_by_access_code, add_event_member
+                        # get_event_by_access_code imported at top
                         event_to_join = get_event_by_access_code(code_input.upper())
                         
                         if event_to_join:
                             if st.session_state.current_user not in event_to_join['members']:
                                 # Add user to event
-                                from database import add_event_member
+                                # add_event_member imported at top
                                 if add_event_member(event_to_join['id'], st.session_state.current_user, 'member'):
                                     st.success(f"✅ Joined event: {event_to_join['name']}")
                                     time.sleep(1)
