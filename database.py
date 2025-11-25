@@ -275,26 +275,10 @@ def register_user(user_data):
         return False
     
     try:
-        st.write(f"Attempting to register user: {user_data.get('username')}")
         response = supabase.table('users').insert(user_data).execute()
-        
-        # Check if response contains data (successful insert usually returns data)
-        if hasattr(response, 'data'):
-            st.write(f"Registration response data: {response.data}")
-            if not response.data:
-                st.warning("Registration executed but returned no data. This might indicate an RLS policy issue blocking the read of the inserted row.")
-            return True
-        else:
-            st.warning("Registration response has no 'data' attribute.")
-            return True # Assuming success if no exception
-            
+        return True
     except Exception as e:
         st.error(f"Error registering user: {e}")
-        # Print more details if available
-        if hasattr(e, 'details'):
-             st.error(f"Error details: {e.details}")
-        if hasattr(e, 'message'):
-             st.error(f"Error message: {e.message}")
         return False
 
 def update_user(username, updates):
