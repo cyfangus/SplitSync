@@ -230,8 +230,65 @@ with st.spinner("🔄 Refreshing data..."):
     data = st.session_state.data = load_data(current_user=st.session_state.get('current_user'))
 
 # --- Auto-login from query params ---
+query_params = st.query_params
+
+# Handle Invite Links
+if 'invite' in query_params:
+    invite_code = query_params['invite']
+    # Store invite code in session state to handle after login
+    st.session_state.pending_invite = invite_code
+    
+    # If user is already logged in, try to join immediately
+    if st.session_state.current_user:
+        with st.spinner("🔗 Processing invite link..."):
+            from database import get_event_by_access_code, add_event_member
+            # In this simple implementation, we use the event ID as the invite code
+            # But for security, we should verify it exists first
+            # Here we assume invite_code is the event ID for simplicity, or we could look it up
+            
+            # Let's try to find the event
+            target_event = next((e for e in data.get('events', []) if e['id'] == invite_code), None)
+            
+            if target_event:
+                if st.session_state.current_user in target_event['members']:
+                    st.success(f"✅ You are already a member of '{target_event['name']}'")
+                    st.session_state.current_event = target_event
+                    # Clear query param
+                    st.query_params.clear()
+                else:
+                    if add_event_member(target_event['id'], st.session_state.current_user):
+                        st.success(f"🎉 Successfully joined '{target_event['name']}'!")
+                        load_data.clear() # Refresh data
+                        st.session_state.data = load_data(st.session_state.current_user)
+                        st.session_state.current_event = target_event
+                        st.query_params.clear()
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Failed to join event via invite link.")
+            else:
+                # Maybe it's an access code?
+                event_by_code = get_event_by_access_code(invite_code)
+                if event_by_code:
+                     if st.session_state.current_user in event_by_code['members']:
+                        st.success(f"✅ You are already a member of '{event_by_code['name']}'")
+                        st.session_state.current_event = event_by_code
+                        st.query_params.clear()
+                     else:
+                        if add_event_member(event_by_code['id'], st.session_state.current_user):
+                            st.success(f"🎉 Successfully joined '{event_by_code['name']}'!")
+                            load_data.clear()
+                            st.session_state.data = load_data(st.session_state.current_user)
+                            st.session_state.current_event = event_by_code
+                            st.query_params.clear()
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                             st.error("Failed to join event.")
+                else:
+                    st.error("Invalid invite link.")
+
 if not st.session_state.current_user:
-    query_params = st.query_params
     if 'user' in query_params:
         username_from_url = query_params['user']
         # Verify user exists in database
@@ -613,6 +670,27 @@ elif not st.session_state.current_event:
     
     with col1:
         st.markdown("### Create New Event")
+        
+        # --- Smart Import Feature ---
+        with st.expander("✨ Import from WhatsApp/Text", expanded=False):
+            st.caption("Paste your WhatsApp group info here to auto-fill details.")
+            import_text = st.text_area("Group Info / Text", height=100, placeholder="Example:\nGroup: Japan Trip\nMembers: John, Sarah, +1 234 567 890")
+            
+            if st.button("Parse & Fill"):
+                if import_text:
+                    from utils import parse_group_info
+                    info = parse_group_info(import_text)
+                    if info['name']:
+                        st.session_state.new_event_name = info['name']
+                        st.success(f"Found Event: {info['name']}")
+                    if info['members']:
+                        # We can't auto-add members to the database yet, but we can list them
+                        # For now, let's just use the name, as members need to be registered users
+                        st.info(f"Found potential members: {', '.join(info['members'])}")
+                        st.caption("Note: You'll need to invite them after creating the event.")
+                else:
+                    st.warning("Please paste some text first.")
+        
         # Initialize session state for create event
         if 'event_created' not in st.session_state:
             st.session_state.event_created = False
@@ -622,7 +700,13 @@ elif not st.session_state.current_event:
             st.session_state.event_created = False
         
         with st.form("new_event", clear_on_submit=True):
-            event_name = st.text_input("Event Name", placeholder="e.g. Japan Trip 2024")
+            # Use session state value if available (from import)
+            default_name = st.session_state.get('new_event_name', '')
+            event_name = st.text_input("Event Name", value=default_name, placeholder="e.g. Japan Trip 2024")
+            
+            # Clear the session state after using it so it doesn't persist forever
+            if 'new_event_name' in st.session_state:
+                del st.session_state.new_event_name
             
             # Currency selection
             currencies = {
@@ -1608,6 +1692,29 @@ Thanks!
     # --- Manage Event ---
     elif menu == "Manage Event":
         st.title("Manage Event")
+        
+        # --- Invite Members Section ---
+        st.subheader("🔗 Invite Members")
+        
+        # Generate Invite Link
+        # In production, this would be your actual domain
+        # For local dev, it might be localhost:8501
+        base_url = "https://splitsync.streamlit.app" # Replace with your actual URL
+        invite_link = f"{base_url}/?invite={current_event['id']}"
+        
+        st.info("Share this link to let others join instantly:")
+        st.code(invite_link, language="text")
+        
+        # WhatsApp Share Button
+        # URL encode the message
+        import urllib.parse
+        message = f"Join our '{current_event['name']}' expense group on SplitSync: {invite_link}"
+        encoded_message = urllib.parse.quote(message)
+        whatsapp_url = f"https://wa.me/?text={encoded_message}"
+        
+        st.link_button("📲 Share on WhatsApp", whatsapp_url, type="primary")
+        
+        st.divider()
         
         # Initialize profile view state
         if 'viewing_profile' not in st.session_state:
