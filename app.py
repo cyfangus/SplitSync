@@ -347,15 +347,7 @@ if not st.session_state.current_user:
                         st.error(f"Login error: {e}")
                 else:
                     st.error("Database connection error.")
-# -------------------------------------------------
-# Process pending invite after login rerun
-if st.session_state.get('current_user') and st.session_state.get('pending_invite'):
-    pending = st.session_state.pending_invite
-    with st.spinner("🔗 Processing pending invite..."):
-        _process_invite(pending, st.session_state.current_user)
-    # clean up
-    st.session_state.pop('pending_invite', None)
-    st.query_params.clear()
+
 # -------------------------------------------------
     with tab2:
         st.markdown("Create a new account.")
