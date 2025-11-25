@@ -20,9 +20,19 @@ def init_db():
     """
     supabase = init_connection()
     if not supabase:
+        st.error("Failed to initialize Supabase connection.")
         return
-    # Optional: Simple health check
-    # supabase.table('users').select("count", count='exact').execute()
+    
+    # Simple health check
+    try:
+        # Try to select 1 row from users to verify connection
+        # We use count to be efficient and avoid data leakage if RLS is weird
+        response = supabase.table('users').select("count", count='exact').limit(1).execute()
+        # st.success("Database connection established.") 
+    except Exception as e:
+        st.error(f"Database health check failed: {e}")
+        if "relation \"public.users\" does not exist" in str(e):
+             st.error("The 'users' table does not exist. Please run schema.sql in Supabase SQL Editor.")
 
 def load_data(current_user=None):
     """Load all data from Supabase and reconstruct the app's expected structure.
@@ -261,13 +271,30 @@ def register_user(user_data):
     """Register a new user."""
     supabase = init_connection()
     if not supabase:
+        st.error("Database connection failed during registration.")
         return False
     
     try:
-        supabase.table('users').insert(user_data).execute()
-        return True
+        st.write(f"Attempting to register user: {user_data.get('username')}")
+        response = supabase.table('users').insert(user_data).execute()
+        
+        # Check if response contains data (successful insert usually returns data)
+        if hasattr(response, 'data'):
+            st.write(f"Registration response data: {response.data}")
+            if not response.data:
+                st.warning("Registration executed but returned no data. This might indicate an RLS policy issue blocking the read of the inserted row.")
+            return True
+        else:
+            st.warning("Registration response has no 'data' attribute.")
+            return True # Assuming success if no exception
+            
     except Exception as e:
         st.error(f"Error registering user: {e}")
+        # Print more details if available
+        if hasattr(e, 'details'):
+             st.error(f"Error details: {e.details}")
+        if hasattr(e, 'message'):
+             st.error(f"Error message: {e.message}")
         return False
 
 def update_user(username, updates):
