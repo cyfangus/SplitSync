@@ -74,6 +74,55 @@ from database import (
 # Initialize database on first run
 init_db()
 
+# -------------------------------------------------------------------
+# Helper function to process invite links (used both on page load and after login)
+def _process_invite(invite_code: str, username: str):
+    """Attempt to join the event identified by *invite_code* for *username*.
+    Handles both direct event‑id invites and access‑code invites.
+    Returns True if the invite was processed (success or known failure).
+    """
+    data = st.session_state.data
+
+    # 1️⃣ Try to find the event by its ID (string compare to avoid type mismatches)
+    target_event = next(
+        (e for e in data.get('events', []) if str(e.get('id')) == str(invite_code)),
+        None,
+    )
+    if target_event:
+        if username in target_event.get('members', []):
+            st.success(f"✅ You are already a member of '{target_event['name']}'")
+        else:
+            if add_event_member(target_event['id'], username):
+                st.success(f"🎉 Successfully joined '{target_event['name']}'!")
+                load_data.clear()
+                st.session_state.data = load_data(username)
+            else:
+                st.error("Failed to join event via invite link.")
+        st.session_state.current_event = target_event
+        st.query_params.clear()
+        return True
+
+    # 2️⃣ Maybe it's an access code (different lookup)
+    event_by_code = get_event_by_access_code(invite_code)
+    if event_by_code:
+        if username in event_by_code.get('members', []):
+            st.success(f"✅ You are already a member of '{event_by_code['name']}'")
+        else:
+            if add_event_member(event_by_code['id'], username):
+                st.success(f"🎉 Successfully joined '{event_by_code['name']}'!")
+                load_data.clear()
+                st.session_state.data = load_data(username)
+            else:
+                st.error("Failed to join event via invite link.")
+        st.session_state.current_event = event_by_code
+        st.query_params.clear()
+        return True
+
+    # 3️⃣ Nothing matched – invalid link
+    st.error("Invalid invite link.")
+    return False
+# -------------------------------------------------------------------
+
 def send_email(to_email, subject, body):
     if "email" not in st.secrets:
         st.error("Email configuration missing in secrets.")
@@ -235,58 +284,13 @@ query_params = st.query_params
 # Handle Invite Links
 if 'invite' in query_params:
     invite_code = query_params['invite']
-    # Store invite code in session state to handle after login
+    # Store invite code for later if user not logged in yet
     st.session_state.pending_invite = invite_code
-    
-    # If user is already logged in, try to join immediately
-    if st.session_state.current_user:
+    # If user is already logged in, process immediately
+    if st.session_state.get('current_user'):
         with st.spinner("🔗 Processing invite link..."):
-            from database import get_event_by_access_code, add_event_member
-            # In this simple implementation, we use the event ID as the invite code
-            # But for security, we should verify it exists first
-            # Here we assume invite_code is the event ID for simplicity, or we could look it up
-            
-            # Let's try to find the event
-            target_event = next((e for e in data.get('events', []) if e['id'] == invite_code), None)
-            
-            if target_event:
-                if st.session_state.current_user in target_event['members']:
-                    st.success(f"✅ You are already a member of '{target_event['name']}'")
-                    st.session_state.current_event = target_event
-                    # Clear query param
-                    st.query_params.clear()
-                else:
-                    if add_event_member(target_event['id'], st.session_state.current_user):
-                        st.success(f"🎉 Successfully joined '{target_event['name']}'!")
-                        load_data.clear() # Refresh data
-                        st.session_state.data = load_data(st.session_state.current_user)
-                        st.session_state.current_event = target_event
-                        st.query_params.clear()
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("Failed to join event via invite link.")
-            else:
-                # Maybe it's an access code?
-                event_by_code = get_event_by_access_code(invite_code)
-                if event_by_code:
-                     if st.session_state.current_user in event_by_code['members']:
-                        st.success(f"✅ You are already a member of '{event_by_code['name']}'")
-                        st.session_state.current_event = event_by_code
-                        st.query_params.clear()
-                     else:
-                        if add_event_member(event_by_code['id'], st.session_state.current_user):
-                            st.success(f"🎉 Successfully joined '{event_by_code['name']}'!")
-                            load_data.clear()
-                            st.session_state.data = load_data(st.session_state.current_user)
-                            st.session_state.current_event = event_by_code
-                            st.query_params.clear()
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                             st.error("Failed to join event.")
-                else:
-                    st.error("Invalid invite link.")
+            _process_invite(invite_code, st.session_state.current_user)
+    # If not logged in, the pending invite will be handled after successful login
 
 if not st.session_state.current_user:
     if 'user' in query_params:
@@ -323,10 +327,16 @@ if not st.session_state.current_user:
                                 st.session_state.current_user = user['username']
                                 # Set query param for persistent login
                                 st.query_params['user'] = user['username']
-                                # Clear cache to load fresh data for the logged-in user
+                                # Clear cache and reload fresh data for the logged‑in user
                                 load_data.clear()
-                                # Force reload data into session state
                                 st.session_state.data = load_data(current_user=user['username'])
+                                # Show events automatically after login
+                                st.session_state.show_events = True
+                                # ---- Handle a pending invite if present ----
+                                if st.session_state.get('pending_invite'):
+                                    pending = st.session_state.pop('pending_invite')
+                                    with st.spinner("🔗 Processing pending invite..."):
+                                        _process_invite(pending, user['username'])
                                 time.sleep(0.5)  # Brief pause to show success message
                                 st.rerun()
                             else:
