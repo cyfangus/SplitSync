@@ -54,15 +54,12 @@ def load_data(current_user=None):
             # First, get event IDs where user is a member
             response = supabase.table('event_members').select("event_id").eq('username', current_user).execute()
             user_event_ids = [m['event_id'] for m in response.data]
-            st.write(f"Debug: Found event_ids for {current_user}: {user_event_ids}")
             
             if user_event_ids:
                 # Load only events the user is a member of
                 response = supabase.table('events').select("*").in_('id', user_event_ids).execute()
                 events_raw = response.data
-                st.write(f"Debug: Loaded {len(events_raw)} events")
             else:
-                st.write("Debug: No event_ids found for user")
                 events_raw = []
         else:
             # Not logged in, return empty events
