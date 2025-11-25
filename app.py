@@ -628,23 +628,31 @@ elif not st.session_state.current_event:
             if submitted:
                 if event_name:
                     with st.spinner("Creating event..."):
+                        # Generate unique event ID using timestamp
+                        import time
+                        event_id = f"event_{int(time.time() * 1000)}"
+                        
                         # Generate unique access code
                         access_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
                         
                         new_event = {
-                            "id": f"event_{len(data['events']) + 1}",
+                            "id": event_id,
                             "name": event_name,
                             "members": members,
                             "roles": {st.session_state.current_user: "admin"},  # Creator is admin
                             "currency": selected_currency,
                             "expenses": [],
-                            "access_code": access_code
+                            "access_code": access_code,
+                            "settlements": []
                         }
-                        data['events'].append(new_event)
-                        save_data(data)
-                        st.session_state.data = data
-                        st.session_state.event_created = True
-                        st.rerun()
+                        
+                        # Use create_event instead of save_data
+                        from database import create_event
+                        if create_event(new_event):
+                            st.success(f"✅ Event '{event_name}' created! Access code: **{access_code}**")
+                            st.info("Refresh the page to see your new event.")
+                        else:
+                            st.error("❌ Failed to create event. Please check the error message above.")
                 else:
                     st.error("Please provide an event name.")
 
