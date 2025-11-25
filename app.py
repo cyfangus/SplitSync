@@ -63,7 +63,7 @@ st.markdown("""
 
 # --- Data Management ---
 # --- Data Management ---
-from database_simple import (
+from database import (
     init_db, load_data, save_data, 
     register_user, create_event, add_expense, 
     add_event_member, get_event_by_access_code,
