@@ -325,6 +325,8 @@ if not st.session_state.current_user:
                                 st.query_params['user'] = user['username']
                                 # Clear cache to load fresh data for the logged-in user
                                 load_data.clear()
+                                # Force reload data into session state
+                                st.session_state.data = load_data(current_user=user['username'])
                                 time.sleep(0.5)  # Brief pause to show success message
                                 st.rerun()
                             else:
