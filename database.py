@@ -34,6 +34,7 @@ def init_db():
         if "relation \"public.users\" does not exist" in str(e):
              st.error("The 'users' table does not exist. Please run schema.sql in Supabase SQL Editor.")
 
+@st.cache_data(ttl=10)  # Cache for 10 seconds to reduce database load
 def load_data(current_user=None):
     """Load all data from Supabase and reconstruct the app's expected structure.
     
@@ -46,20 +47,28 @@ def load_data(current_user=None):
 
     try:
         # 1. Load Users (needed for lookups, but filter sensitive data)
-        response = supabase.table('users').select("username, email, avatar").execute()
-        users = response.data
+        try:
+            response = supabase.table('users').select("username, email, avatar").execute()
+            users = response.data
+        except Exception as e:
+            st.error(f"Error loading users: {e}")
+            users = []
 
         # 2. Load Events - Filter by current user if logged in
         if current_user:
-            # First, get event IDs where user is a member
-            response = supabase.table('event_members').select("event_id").eq('username', current_user).execute()
-            user_event_ids = [m['event_id'] for m in response.data]
-            
-            if user_event_ids:
-                # Load only events the user is a member of
-                response = supabase.table('events').select("*").in_('id', user_event_ids).execute()
-                events_raw = response.data
-            else:
+            try:
+                # First, get event IDs where user is a member
+                response = supabase.table('event_members').select("event_id").eq('username', current_user).execute()
+                user_event_ids = [m['event_id'] for m in response.data]
+                
+                if user_event_ids:
+                    # Load only events the user is a member of
+                    response = supabase.table('events').select("*").in_('id', user_event_ids).execute()
+                    events_raw = response.data
+                else:
+                    events_raw = []
+            except Exception as e:
+                st.error(f"Error loading events for user {current_user}: {e}")
                 events_raw = []
         else:
             # Not logged in, return empty events
@@ -67,30 +76,46 @@ def load_data(current_user=None):
 
         # 3. Load Event Members (only for user's events)
         if current_user and user_event_ids:
-            response = supabase.table('event_members').select("*").in_('event_id', user_event_ids).execute()
-            members_raw = response.data
+            try:
+                response = supabase.table('event_members').select("*").in_('event_id', user_event_ids).execute()
+                members_raw = response.data
+            except Exception as e:
+                st.error(f"Error loading event members: {e}")
+                members_raw = []
         else:
             members_raw = []
 
         # 4. Load Expenses (only for user's events)
         if current_user and user_event_ids:
-            response = supabase.table('expenses').select("*").in_('event_id', user_event_ids).execute()
-            expenses_raw = response.data
+            try:
+                response = supabase.table('expenses').select("*").in_('event_id', user_event_ids).execute()
+                expenses_raw = response.data
+            except Exception as e:
+                st.error(f"Error loading expenses: {e}")
+                expenses_raw = []
         else:
             expenses_raw = []
 
         # 5. Load Expense Participants (only for user's events)
         if expenses_raw:
-            expense_ids = [e['id'] for e in expenses_raw]
-            response = supabase.table('expense_participants').select("*").in_('expense_id', expense_ids).execute()
-            participants_raw = response.data
+            try:
+                expense_ids = [e['id'] for e in expenses_raw]
+                response = supabase.table('expense_participants').select("*").in_('expense_id', expense_ids).execute()
+                participants_raw = response.data
+            except Exception as e:
+                st.error(f"Error loading expense participants: {e}")
+                participants_raw = []
         else:
             participants_raw = []
 
         # 6. Load Settlements (only for user's events)
         if current_user and user_event_ids:
-            response = supabase.table('settlements').select("*").in_('event_id', user_event_ids).execute()
-            settlements_raw = response.data
+            try:
+                response = supabase.table('settlements').select("*").in_('event_id', user_event_ids).execute()
+                settlements_raw = response.data
+            except Exception as e:
+                st.error(f"Error loading settlements: {e}")
+                settlements_raw = []
         else:
             settlements_raw = []
 
@@ -151,6 +176,8 @@ def load_data(current_user=None):
 
     except Exception as e:
         st.error(f"Error loading data from Supabase: {e}")
+        import traceback
+        st.code(traceback.format_exc())
         return {'users': [], 'events': []}
 
 # ===== NEW: Individual CRUD Operations =====
