@@ -1278,6 +1278,133 @@ else:
             for debt in debts:
                 st.write(f"• **{debt['debtor']}** owes **{debt['creditor']}**: {format_currency(debt['amount'])}")
         
+        
+        st.divider()
+        
+        # Payment Reminder Feature
+        st.subheader("📧 Send Payment Reminder")
+        
+        # Check permissions
+        user_is_admin = is_admin()
+        
+        # Find who owes the current user money
+        current_user_credits = [d for d in debts if d['creditor'] == st.session_state.current_user]
+        
+        # Admins can send reminders for any debt
+        if user_is_admin:
+            available_debts = debts
+            if not available_debts:
+                st.info("💡 No outstanding debts in this event.")
+            else:
+                st.caption("👑 Admin Mode: You can send reminders for any outstanding debt.")
+        else:
+            available_debts = current_user_credits
+            if not available_debts:
+                st.info("💡 No one owes you money in this event.")
+        
+        if available_debts:
+            if not user_is_admin:
+                st.write("You can send a friendly reminder to people who owe you money:")
+            
+            # Initialize session state for reminder
+            if 'reminder_sent' not in st.session_state:
+                st.session_state.reminder_sent = False
+            
+            if st.session_state.reminder_sent:
+                st.success("✅ Reminder email sent successfully!")
+                st.session_state.reminder_sent = False
+            
+            with st.expander("💌 Send Reminder Email", expanded=False):
+                # Select which debt to remind about
+                debt_options = {}
+                for debt in available_debts:
+                    debtor_name = debt['debtor']
+                    creditor_name = debt['creditor']
+                    amount = debt['amount']
+                    if user_is_admin:
+                        # Show both parties for admin
+                        debt_key = f"{debtor_name}→{creditor_name}"
+                        debt_options[debt_key] = f"{debtor_name} owes {creditor_name}: {format_currency(amount)}"
+                    else:
+                        # Show only debtor for regular users
+                        debt_key = debtor_name
+                        debt_options[debt_key] = f"{debtor_name} owes you {format_currency(amount)}"
+                
+                selected_debt_key = st.selectbox(
+                    "Send reminder about:",
+                    options=list(debt_options.keys()),
+                    format_func=lambda x: debt_options[x]
+                )
+                
+                # Find the selected debt
+                if user_is_admin:
+                    debtor_name, creditor_name = selected_debt_key.split('→')
+                    selected_debt = next((d for d in available_debts if d['debtor'] == debtor_name and d['creditor'] == creditor_name), None)
+                else:
+                    selected_debt = next((d for d in available_debts if d['debtor'] == selected_debt_key), None)
+                
+                if selected_debt:
+                    debtor_name = selected_debt['debtor']
+                    creditor_name = selected_debt['creditor']
+                    
+                    # Get debtor's email
+                    debtor_user = next((u for u in data['users'] if u['username'] == debtor_name), None)
+                    
+                    if debtor_user and debtor_user.get('email'):
+                        st.info(f"📧 Will send to: {debtor_user['email']}")
+                        
+                        # Default message (different for admin vs regular user)
+                        if user_is_admin:
+                            default_message = f"""Hi {debtor_name},
+
+This is a reminder about the outstanding balance in the "{current_event['name']}" event.
+
+You owe {creditor_name}: {format_currency(selected_debt['amount'])}
+
+Please settle this at your earliest convenience. You can record the payment in the app once done.
+
+Best regards,
+{st.session_state.current_user} (Event Admin)"""
+                        else:
+                            default_message = f"""Hi {debtor_name},
+
+This is a friendly reminder about the outstanding balance in our "{current_event['name']}" event.
+
+Amount owed: {format_currency(selected_debt['amount'])}
+
+Please settle this at your earliest convenience. You can record the payment in the app once done.
+
+Thanks!
+{st.session_state.current_user}"""
+                        
+                        # Custom message input
+                        custom_message = st.text_area(
+                            "Customize your message:",
+                            value=default_message,
+                            height=200,
+                            help="Edit the message above to personalize your reminder"
+                        )
+                        
+                        # Preview
+                        with st.expander("📄 Email Preview", expanded=False):
+                            st.markdown("**Subject:** Payment Reminder - " + current_event['name'])
+                            st.markdown("**To:** " + debtor_user['email'])
+                            st.markdown("---")
+                            st.text(custom_message)
+                        
+                        # Send button
+                        if st.button("📤 Send Reminder Email", type="primary"):
+                            with st.spinner("📧 Sending reminder..."):
+                                subject = f"Payment Reminder - {current_event['name']}"
+                                if send_email(debtor_user['email'], subject, custom_message):
+                                    st.session_state.reminder_sent = True
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to send email. Please check your email configuration.")
+                    else:
+                        st.warning(f"⚠️ {debtor_name} doesn't have an email address registered.")
+                        st.caption("Ask them to add their email in Account Settings.")
+        
         st.divider()
         
         # Payment recording form
