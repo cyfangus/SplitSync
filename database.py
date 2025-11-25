@@ -254,3 +254,241 @@ def save_data(data):
     """
     st.warning("⚠️ save_data() is deprecated. Use create_event(), add_expense(), etc. instead.")
     return False
+
+# ===== User Operations =====
+
+def register_user(user_data):
+    """Register a new user."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table('users').insert(user_data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error registering user: {e}")
+        return False
+
+def update_user(username, updates):
+    """Update user information."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table('users').update(updates).eq('username', username).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating user: {e}")
+        return False
+
+def delete_user(username):
+    """Delete a user."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table('users').delete().eq('username', username).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting user: {e}")
+        return False
+
+# ===== Event Member Operations =====
+
+def add_event_member(event_id, username, role='member'):
+    """Add a member to an event."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table('event_members').insert({
+            'event_id': event_id,
+            'username': username,
+            'role': role
+        }).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error adding member: {e}")
+        return False
+
+def remove_event_member(event_id, username):
+    """Remove a member from an event."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table('event_members').delete().eq('event_id', event_id).eq('username', username).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error removing member: {e}")
+        return False
+
+def update_member_role(event_id, username, new_role):
+    """Update a member's role in an event."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table('event_members').update({'role': new_role}).eq('event_id', event_id).eq('username', username).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating role: {e}")
+        return False
+
+# ===== Expense Operations =====
+
+def update_expense(expense_id, updates):
+    """Update an expense."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        # Separate participants from other updates
+        participants = updates.pop('involved', None)
+        
+        if updates:
+            supabase.table('expenses').update(updates).eq('id', expense_id).execute()
+        
+        if participants is not None:
+            # Update participants: Delete old, insert new
+            supabase.table('expense_participants').delete().eq('expense_id', expense_id).execute()
+            
+            for participant in participants:
+                supabase.table('expense_participants').insert({
+                    'expense_id': expense_id,
+                    'username': participant
+                }).execute()
+            
+        return True
+    except Exception as e:
+        st.error(f"Error updating expense: {e}")
+        return False
+
+def delete_expense(expense_id):
+    """Delete an expense."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        # Delete participants first (foreign key)
+        supabase.table('expense_participants').delete().eq('expense_id', expense_id).execute()
+        # Delete expense
+        supabase.table('expenses').delete().eq('id', expense_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting expense: {e}")
+        return False
+
+# ===== Settlement Operations =====
+
+def add_settlement(event_id, settlement_data):
+    """Add a settlement to an event."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        settlement_data['event_id'] = event_id
+        supabase.table('settlements').insert(settlement_data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error adding settlement: {e}")
+        return False
+
+def delete_settlement(settlement_id):
+    """Delete a settlement."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        supabase.table('settlements').delete().eq('id', settlement_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting settlement: {e}")
+        return False
+
+# ===== Event Operations =====
+
+def delete_event(event_id):
+    """Delete an event and all related data."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        # Foreign keys will cascade delete related data
+        supabase.table('events').delete().eq('id', event_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting event: {e}")
+        return False
+
+# ===== Helper Functions =====
+
+def get_user_by_username(username):
+    """Get user details by username."""
+    supabase = init_connection()
+    if not supabase:
+        return None
+    try:
+        response = supabase.table('users').select("*").eq('username', username).execute()
+        return response.data[0] if response.data else None
+    except Exception:
+        return None
+
+def get_event_by_access_code(access_code):
+    """Get event details by access code."""
+    supabase = init_connection()
+    if not supabase:
+        return None
+    try:
+        response = supabase.table('events').select("*").eq('access_code', access_code).execute()
+        if response.data:
+            event = response.data[0]
+            # Fetch members for this event to be consistent with app expectation
+            members_response = supabase.table('event_members').select("username").eq('event_id', event['id']).execute()
+            event['members'] = [m['username'] for m in members_response.data]
+            return event
+        return None
+    except Exception:
+        return None
+
+def update_username_references_in_db(old_username, new_username):
+    """
+    Update all references to a username in the database.
+    Note: Since FKs are not ON UPDATE CASCADE, we must do this manually.
+    This is risky without transactions.
+    """
+    supabase = init_connection()
+    if not supabase:
+        return False
+    
+    try:
+        # 1. Event Members
+        supabase.table('event_members').update({'username': new_username}).eq('username', old_username).execute()
+        
+        # 2. Expenses (payer)
+        supabase.table('expenses').update({'payer': new_username}).eq('payer', old_username).execute()
+        
+        # 3. Expense Participants
+        supabase.table('expense_participants').update({'username': new_username}).eq('username', old_username).execute()
+        
+        # 4. Settlements (payer)
+        supabase.table('settlements').update({'payer': new_username}).eq('payer', old_username).execute()
+        
+        # 5. Settlements (recipient)
+        supabase.table('settlements').update({'recipient': new_username}).eq('recipient', old_username).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error updating username references: {e}")
+        return False

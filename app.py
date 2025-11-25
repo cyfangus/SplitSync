@@ -469,12 +469,12 @@ elif not st.session_state.current_event:
                         img_str = base64.b64encode(buffered.getvalue()).decode()
                         
                         # Save
-                        user_idx = next((i for i, u in enumerate(data['users']) if u['username'] == st.session_state.current_user), -1)
-                        if user_idx != -1:
-                            data['users'][user_idx]['avatar'] = img_str
-                            save_data(data)
+                        from database import update_user
+                        if update_user(st.session_state.current_user, {'avatar': img_str}):
                             st.success("✅ Avatar updated!")
                             st.rerun()
+                        else:
+                            st.error("Failed to update avatar.")
                     except Exception as e:
                         st.error(f"Error processing image: {e}")
         
@@ -533,18 +533,27 @@ elif not st.session_state.current_event:
                             st.error("Username can only contain letters, numbers, and underscores (no spaces).")
                         elif len(new_username) < 3:
                             st.error("Username must be at least 3 characters long.")
-                        elif any(u['username'] == new_username for u in data['users']):
-                            st.error("Username already taken.")
                         else:
-                            user_idx = next((i for i, u in enumerate(data['users']) if u['username'] == st.session_state.current_user), -1)
-                            if user_idx != -1:
+                            # Update username in database
+                            from database import update_user, get_user_by_username, update_username_references_in_db
+                            
+                            existing_user = get_user_by_username(new_username)
+                            if existing_user:
+                                st.error("Username already taken.")
+                            else:
                                 old_user = st.session_state.current_user
-                                data['users'][user_idx]['username'] = new_username
-                                update_username_references(data, old_user, new_username)
-                                st.session_state.current_user = new_username
-                                save_data(data)
-                                st.success("✅ Username updated successfully!")
-                                st.rerun()
+                                if update_user(old_user, {'username': new_username}):
+                                    # Update references
+                                    if update_username_references_in_db(old_user, new_username):
+                                        st.session_state.current_user = new_username
+                                        st.query_params['user'] = new_username
+                                        st.success(f"✅ Username changed to {new_username}!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to update username references.")
+                                else:
+                                    st.error("Failed to update username.")
                     elif new_username == st.session_state.current_user:
                         st.info("New username is the same as current.")
                     else:
@@ -683,23 +692,19 @@ elif not st.session_state.current_event:
                     with st.spinner("Joining event..."):
                         # Find event with matching code
                         matching_event = None
-                        for evt in data['events']:
-                            if evt.get('access_code') == code_input.upper():
-                                matching_event = evt
-                                break
+                        from database import get_event_by_access_code, add_event_member
+                        event_to_join = get_event_by_access_code(code_input.upper())
                         
-                        if matching_event:
-                            if st.session_state.current_user not in matching_event['members']:
-                                matching_event['members'].append(st.session_state.current_user)
-                                # Ensure roles dict exists
-                                if 'roles' not in matching_event:
-                                    matching_event['roles'] = {}
-                                # Assign member role
-                                matching_event['roles'][st.session_state.current_user] = "member"
-                                save_data(data)
-                                st.session_state.data = data
-                                st.session_state.event_joined = True
-                                st.rerun()
+                        if event_to_join:
+                            if st.session_state.current_user not in event_to_join['members']:
+                                # Add user to event
+                                from database import add_event_member
+                                if add_event_member(event_to_join['id'], st.session_state.current_user, 'member'):
+                                    st.success(f"✅ Joined event: {event_to_join['name']}")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to join event.")
                             else:
                                 st.info("You are already a member of this event.")
                         else:
@@ -971,8 +976,7 @@ else:
                                 if amount_in_original > 0:
                                     exch_rate = final_amount / amount_in_original
                         
-                        new_expense = {
-                            "id": len(current_event['expenses']) + 1,
+                        expense_data = {
                             "title": title,
                             "amount": final_amount,
                             "original_amount": original_amt,
@@ -984,11 +988,13 @@ else:
                             "category": category,
                             "settled": False
                         }
-                        current_event['expenses'].append(new_expense)
-                        save_data(data)
-                        st.session_state.data = data
-                        st.session_state.expense_saved = True
-                        st.rerun()
+                        
+                        from database import add_expense
+                        if add_expense(current_event['id'], expense_data):
+                            st.session_state.expense_saved = True
+                            st.rerun()
+                        else:
+                            st.error("Failed to save expense.")
                 else:
                     st.error("Please fill all required fields.")
 
@@ -1163,32 +1169,37 @@ else:
                                         if new_amount_orig > 0:
                                             exch_rate = final_amount / new_amount_orig
                                 
-                                selected_expense['title'] = new_title
-                                selected_expense['amount'] = final_amount
-                                selected_expense['original_amount'] = original_amt
-                                selected_expense['original_currency'] = original_curr
-                                selected_expense['exchange_rate'] = exch_rate
-                                selected_expense['payer'] = new_payer
-                                selected_expense['category'] = new_category
-                                selected_expense['involved'] = new_involved
-                                selected_expense['date'] = str(new_date)
-                                selected_expense['settled'] = selected_expense.get('settled', False) # Ensure settled status is preserved
+                                updates = {
+                                    'title': new_title,
+                                    'amount': final_amount,
+                                    'original_amount': original_amt,
+                                    'original_currency': original_curr,
+                                    'exchange_rate': exch_rate,
+                                    'payer': new_payer,
+                                    'category': new_category,
+                                    'involved': new_involved,
+                                    'date': str(new_date),
+                                    'settled': selected_expense.get('settled', False)
+                                }
                                 
-                                save_data(data)
-                                st.session_state.data = data
-                                st.session_state.expense_updated = True
-                                st.rerun()
+                                from database import update_expense
+                                if update_expense(selected_expense['id'], updates):
+                                    st.session_state.expense_updated = True
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update expense.")
                         else:
                             st.error("Please fill all required fields.")
                 
                 # Delete button is now outside the form
                 if st.button("🗑️ Delete Expense"):
                     with st.spinner("Deleting expense..."):
-                        current_event['expenses'].pop(selected_idx) # Use pop with index to remove
-                        save_data(data)
-                        st.session_state.data = data
-                        st.success("Expense deleted successfully!")
-                        st.rerun()
+                        from database import delete_expense
+                        if delete_expense(selected_expense['id']):
+                            st.success("Expense deleted successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete expense.")
 
 
     # --- Settle Expenses ---
@@ -1352,23 +1363,23 @@ else:
                 if submitted:
                     with st.spinner("Recording payment..."):
                         # Create settlement record
-                        new_settlement = {
-                            "id": len(current_event.get('settlements', [])) + 1,
-                            "from_user": payer,
-                            "to_user": recipient,
-                            "amount": converted_amount,  # Store converted amount in event currency
-                            "original_amount": amount if use_different_currency else None,
-                            "original_currency": payment_currency if use_different_currency else None,
-                            "exchange_rate": exchange_rate if use_different_currency else None,
-                            "date": str(payment_date),
+                        settlement_data = {
+                            "payer": payer,
+                            "recipient": recipient,
+                            "amount": amount,
+                            "payment_currency": payment_currency,
+                            "converted_amount": converted_amount,
+                            "exchange_rate": exchange_rate,
+                            "date": str(payment_date), # Use payment_date here
                             "notes": notes
                         }
                         
-                        current_event['settlements'].append(new_settlement)
-                        save_data(data)
-                        st.session_state.data = data
-                        st.session_state.payment_recorded = True
-                        st.rerun()
+                        from database import add_settlement
+                        if add_settlement(current_event['id'], settlement_data):
+                            st.session_state.payment_recorded = True # Changed to payment_recorded
+                            st.rerun()
+                        else:
+                            st.error("Failed to save settlement.")
         
         # Display payment history
         if current_event.get('settlements'):
@@ -1474,13 +1485,13 @@ else:
                 # Only admins can remove members or change roles
                 if is_admin() and member != st.session_state.current_user:
                     if st.button(f"Remove", key=f"remove_{member}"):
-                        current_event['members'].remove(member)
-                        if member in current_event['roles']:
-                            del current_event['roles'][member]
-                        save_data(data)
-                        st.session_state.data = data
-                        st.success(f"Removed {member}")
-                        st.rerun()
+                        from database import remove_event_member
+                        if remove_event_member(current_event['id'], member):
+                            st.success(f"Removed {member} from event.")
+                            st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to remove {member}.")
         
         st.divider()
         
@@ -1507,13 +1518,13 @@ else:
                     st.warning("User already in event.")
                 else:
                     with st.spinner("Adding member..."):
-                        current_event['members'].append(new_member_username)
-                        # Assign default member role
-                        current_event['roles'][new_member_username] = "member"
-                        save_data(data)
-                        st.session_state.data = data
-                        st.session_state.member_added = True
-                        st.rerun()
+                        from database import add_event_member
+                        if add_event_member(current_event['id'], new_member_username):
+                            st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
+                            st.session_state.member_added = True
+                            st.rerun()
+                        else:
+                            st.error("Failed to add member.")
         
         # Role Management Section (Admin Only)
         if is_admin():
@@ -1542,11 +1553,13 @@ else:
                     
                     if submitted:
                         with st.spinner("Updating role..."):
-                            current_event['roles'][selected_member] = new_role
-                            save_data(data)
-                            st.session_state.data = data
-                            st.session_state.role_updated = True
-                            st.rerun()
+                            from database import update_member_role
+                            if update_member_role(current_event['id'], selected_member, new_role):
+                                st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
+                                st.session_state.role_updated = True
+                                st.rerun()
+                            else:
+                                st.error("Failed to update role.")
                 else:
                     st.info("No other members to manage.")
                     st.form_submit_button("Update Role", disabled=True)
@@ -1590,12 +1603,28 @@ else:
                 if submitted:
                     if new_currency != current_currency:
                         with st.spinner("Updating currency..."):
-                            current_event['currency'] = new_currency
-                            save_data(data)
-                            st.session_state.data = data
-                            st.session_state.currency_updated = True
+                            from database import update_event
+                        if update_event(current_event['id'], {'currency': new_currency}):
+                            st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
+                            st.success("Event currency updated!")
                             st.rerun()
+                        else:
+                            st.error("Failed to update currency.")
                     else:
                         st.info("Currency is already set to this value.")
 
-
+            # Danger Zone (Admin Only)
+            st.divider()
+            st.subheader("⚠️ Danger Zone")
+            
+            with st.expander("Delete Event"):
+                st.warning("This action cannot be undone. All expenses and data for this event will be permanently deleted.")
+                if st.button("Delete Event Permanently", type="primary"):
+                    from database import delete_event
+                    if delete_event(current_event['id']):
+                        st.success("Event deleted successfully!")
+                        st.session_state.current_event = None
+                        st.session_state.data = load_data(st.session_state.current_user)
+                        st.rerun()
+                    else:
+                        st.error("Failed to delete event.")
