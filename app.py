@@ -1232,15 +1232,38 @@ else:
                         else:
                             st.error("Please fill all required fields.")
                 
-                # Delete button is now outside the form
-                if st.button("🗑️ Delete Expense"):
-                    with st.spinner("🗑️ Deleting expense..."):
-                        from database import delete_expense
-                        if delete_expense(selected_expense['id']):
-                            st.success("Expense deleted successfully!")
+                
+                # Delete button with confirmation
+                st.divider()
+                
+                # Initialize delete confirmation state
+                if 'confirm_delete_expense' not in st.session_state:
+                    st.session_state.confirm_delete_expense = None
+                
+                if st.session_state.confirm_delete_expense == selected_expense['id']:
+                    # Show confirmation dialog
+                    st.warning("⚠️ Are you sure you want to delete this expense? This action cannot be undone!")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ Yes, Delete", type="primary", key="confirm_delete_yes"):
+                            with st.spinner("🗑️ Deleting expense..."):
+                                from database import delete_expense
+                                if delete_expense(selected_expense['id']):
+                                    st.success("Expense deleted successfully!")
+                                    st.session_state.confirm_delete_expense = None
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to delete expense.")
+                                    st.session_state.confirm_delete_expense = None
+                    with col2:
+                        if st.button("❌ Cancel", key="confirm_delete_no"):
+                            st.session_state.confirm_delete_expense = None
                             st.rerun()
-                        else:
-                            st.error("Failed to delete expense.")
+                else:
+                    # Show initial delete button
+                    if st.button("🗑️ Delete Expense", type="secondary"):
+                        st.session_state.confirm_delete_expense = selected_expense['id']
+                        st.rerun()
 
 
     # --- Settle Expenses ---
@@ -1652,14 +1675,26 @@ Thanks!
             with col4:
                 # Only admins can remove members or change roles
                 if is_admin() and member != st.session_state.current_user:
-                    if st.button(f"Remove", key=f"remove_{member}"):
-                        from database import remove_event_member
-                        if remove_event_member(current_event['id'], member):
-                            st.success(f"Removed {member} from event.")
-                            st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
+                    # Initialize remove confirmation state
+                    if 'confirm_remove_member' not in st.session_state:
+                        st.session_state.confirm_remove_member = None
+                    
+                    if st.session_state.confirm_remove_member == member:
+                        # Show confirmation
+                        if st.button(f"✅ Confirm", key=f"confirm_remove_{member}", type="primary"):
+                            from database import remove_event_member
+                            if remove_event_member(current_event['id'], member):
+                                st.success(f"Removed {member} from event.")
+                                st.session_state.data = load_data(st.session_state.current_user)
+                                st.session_state.confirm_remove_member = None
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to remove {member}.")
+                                st.session_state.confirm_remove_member = None
+                    else:
+                        if st.button(f"Remove", key=f"remove_{member}", type="secondary"):
+                            st.session_state.confirm_remove_member = member
                             st.rerun()
-                        else:
-                            st.error(f"Failed to remove {member}.")
         
         st.divider()
         
@@ -1786,13 +1821,42 @@ Thanks!
             st.subheader("⚠️ Danger Zone")
             
             with st.expander("Delete Event"):
-                st.warning("This action cannot be undone. All expenses and data for this event will be permanently deleted.")
-                if st.button("Delete Event Permanently", type="primary"):
-                    from database import delete_event
-                    if delete_event(current_event['id']):
-                        st.success("Event deleted successfully!")
-                        st.session_state.current_event = None
-                        st.session_state.data = load_data(st.session_state.current_user)
+                st.warning("⚠️ This action cannot be undone. All expenses and data for this event will be permanently deleted.")
+                
+                # Initialize delete confirmation state
+                if 'confirm_delete_event' not in st.session_state:
+                    st.session_state.confirm_delete_event = False
+                
+                if not st.session_state.confirm_delete_event:
+                    # First step: Show delete button
+                    if st.button("🗑️ I want to delete this event", type="secondary", key="init_delete_event"):
+                        st.session_state.confirm_delete_event = True
                         st.rerun()
-                    else:
-                        st.error("Failed to delete event.")
+                else:
+                    # Second step: Type event name to confirm
+                    st.error(f"⚠️ **DANGER**: You are about to permanently delete \"{current_event['name']}\"")
+                    st.write("To confirm, please type the event name exactly as shown above:")
+                    
+                    confirm_text = st.text_input("Event name:", key="delete_event_confirm_text")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ Yes, Delete Forever", type="primary", key="final_delete_event", disabled=(confirm_text != current_event['name'])):
+                            if confirm_text == current_event['name']:
+                                with st.spinner("🗑️ Deleting event..."):
+                                    from database import delete_event
+                                    if delete_event(current_event['id']):
+                                        st.success("Event deleted successfully!")
+                                        st.session_state.current_event = None
+                                        st.session_state.data = load_data(st.session_state.current_user)
+                                        st.session_state.confirm_delete_event = False
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to delete event.")
+                                        st.session_state.confirm_delete_event = False
+                            else:
+                                st.error("Event name doesn't match. Deletion cancelled.")
+                    with col2:
+                        if st.button("❌ Cancel", key="cancel_delete_event"):
+                            st.session_state.confirm_delete_event = False
+                            st.rerun()
