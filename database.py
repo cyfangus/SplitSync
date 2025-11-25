@@ -390,6 +390,24 @@ def get_event_by_access_code(access_code):
     except Exception:
         return None
 
+def get_event_by_id(event_id):
+    """Get event by ID."""
+    supabase = init_connection()
+    if not supabase:
+        return None
+    try:
+        # Try to fetch event by ID
+        response = supabase.table('events').select("*").eq('id', event_id).execute()
+        if response.data:
+            event = response.data[0]
+            # Get members
+            members_response = supabase.table('event_members').select("username").eq('event_id', event['id']).execute()
+            event['members'] = [m['username'] for m in (members_response.data or [])]
+            return event
+        return None
+    except Exception:
+        return None
+
 def update_username_references_in_db(old_username, new_username):
     """Update all username references."""
     supabase = init_connection()

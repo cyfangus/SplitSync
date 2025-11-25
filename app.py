@@ -68,7 +68,7 @@ from database import (
     register_user, create_event, add_expense, 
     add_event_member, get_event_by_access_code,
     update_user, update_username_references_in_db,
-    get_user_by_username, init_connection
+    get_user_by_username, init_connection, get_event_by_id
 )
 
 # Initialize database on first run
@@ -102,7 +102,7 @@ def _process_invite(invite_code: str, username: str):
         st.query_params.clear()
         return True
 
-    # 2️⃣ Maybe it's an access code (different lookup)
+    # 2️⃣ Maybe it's an access code
     event_by_code = get_event_by_access_code(invite_code)
     if event_by_code:
         if username in event_by_code.get('members', []):
@@ -118,7 +118,24 @@ def _process_invite(invite_code: str, username: str):
         st.query_params.clear()
         return True
 
-    # 3️⃣ Nothing matched – invalid link
+    # 3️⃣ Try to fetch by ID directly from DB (if not in local cache)
+    # This is crucial for new members joining via direct link
+    event_by_id = get_event_by_id(invite_code)
+    if event_by_id:
+        if username in event_by_id.get('members', []):
+            st.success(f"✅ You are already a member of '{event_by_id['name']}'")
+        else:
+            if add_event_member(event_by_id['id'], username):
+                st.success(f"🎉 Successfully joined '{event_by_id['name']}'!")
+                load_data.clear()
+                st.session_state.data = load_data(username)
+            else:
+                st.error("Failed to join event via invite link.")
+        st.session_state.current_event = event_by_id
+        st.query_params.clear()
+        return True
+
+    # 4️⃣ Nothing matched – invalid link
     st.error("Invalid invite link.")
     return False
 # -------------------------------------------------------------------
@@ -491,6 +508,7 @@ if st.session_state.get('current_user') and st.session_state.get('pending_invite
     with st.spinner("🔗 Processing pending invite..."):
         _process_invite(pending, st.session_state.current_user)
     st.rerun()  # Rerun to show the updated event list
+
 
 # --- Event Selection Screen ---
 elif not st.session_state.current_event:
