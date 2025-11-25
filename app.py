@@ -206,7 +206,8 @@ def validate_password(password):
 
 # --- Session State Initialization ---
 if 'data' not in st.session_state:
-    st.session_state.data = load_data()
+    with st.spinner("🔄 Loading your data..."):
+        st.session_state.data = load_data()
 if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 if 'current_event' not in st.session_state:
@@ -225,7 +226,8 @@ if 'reset_email' not in st.session_state:
     st.session_state.reset_email = None
 
 # Reload data with current user context for security
-data = st.session_state.data = load_data(current_user=st.session_state.get('current_user'))
+with st.spinner("🔄 Refreshing data..."):
+    data = st.session_state.data = load_data(current_user=st.session_state.get('current_user'))
 
 # --- Auto-login from query params ---
 if not st.session_state.current_user:
@@ -248,29 +250,32 @@ if not st.session_state.current_user:
         password_input = st.text_input("Password", type="password")
         
         if st.button("Login", type="primary"):
-            # Query Supabase directly for password verification
-            supabase = init_connection()
-            
-            if supabase:
-                try:
-                    # Fetch user with password for verification
-                    response = supabase.table('users').select("username, password").eq('username', username_input).execute()
-                    
-                    if response.data and len(response.data) > 0:
-                        user = response.data[0]
-                        if verify_password(password_input, user['password']):
-                            st.session_state.current_user = user['username']
-                            # Set query param for persistent login
-                            st.query_params['user'] = user['username']
-                            st.rerun()
+            with st.spinner("🔐 Logging in..."):
+                # Query Supabase directly for password verification
+                supabase = init_connection()
+                
+                if supabase:
+                    try:
+                        # Fetch user with password for verification
+                        response = supabase.table('users').select("username, password").eq('username', username_input).execute()
+                        
+                        if response.data and len(response.data) > 0:
+                            user = response.data[0]
+                            if verify_password(password_input, user['password']):
+                                st.success("✅ Login successful!")
+                                st.session_state.current_user = user['username']
+                                # Set query param for persistent login
+                                st.query_params['user'] = user['username']
+                                time.sleep(0.5)  # Brief pause to show success message
+                                st.rerun()
+                            else:
+                                st.error("Invalid username or password.")
                         else:
                             st.error("Invalid username or password.")
-                    else:
-                        st.error("Invalid username or password.")
-                except Exception as e:
-                    st.error(f"Login error: {e}")
-            else:
-                st.error("Database connection error.")
+                    except Exception as e:
+                        st.error(f"Login error: {e}")
+                else:
+                    st.error("Database connection error.")
 
     with tab2:
         st.markdown("Create a new account.")
@@ -301,18 +306,21 @@ if not st.session_state.current_user:
                             st.warning("Email already registered.")
                         else:
                             # Generate Code
-                            code = ''.join(random.choices(string.digits, k=6))
-                            if send_email(new_email, "SplitSync Verification Code", f"Your code is: {code}"):
-                                st.session_state.reg_code = code
-                                st.session_state.reg_data = {
-                                    "username": new_username,
-                                    "email": new_email,
-                                    "password": hash_password(new_password)
-                                }
-                                st.session_state.reg_step = 2
-                                st.rerun()
-                            else:
-                                st.error("Failed to send email. Check configuration.")
+                            with st.spinner("📧 Sending verification code..."):
+                                code = ''.join(random.choices(string.digits, k=6))
+                                if send_email(new_email, "SplitSync Verification Code", f"Your code is: {code}"):
+                                    st.success("✅ Verification code sent!")
+                                    st.session_state.reg_code = code
+                                    st.session_state.reg_data = {
+                                        "username": new_username,
+                                        "email": new_email,
+                                        "password": hash_password(new_password)
+                                    }
+                                    st.session_state.reg_step = 2
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to send email. Check configuration.")
                     else:
                         st.error("Please fill all fields.")
         
@@ -321,16 +329,18 @@ if not st.session_state.current_user:
             code_input = st.text_input("Enter Verification Code")
             if st.button("Verify & Register"):
                 if code_input == st.session_state.reg_code:
-                    # Use register_user instead of save_data
-                    # register_user imported at top
-                    if register_user(st.session_state.reg_data):
-                        st.success(f"✅ User {st.session_state.reg_data['username']} registered! Please login.")
-                        # Reset state
-                        st.session_state.reg_step = 1
-                        st.session_state.reg_code = None
-                        st.session_state.reg_data = {}
-                    else:
-                        st.error("❌ Registration failed. Please try again.")
+                    with st.spinner("✨ Creating your account..."):
+                        # Use register_user instead of save_data
+                        # register_user imported at top
+                        if register_user(st.session_state.reg_data):
+                            st.success(f"✅ User {st.session_state.reg_data['username']} registered! Please login.")
+                            # Reset state
+                            st.session_state.reg_step = 1
+                            st.session_state.reg_code = None
+                            st.session_state.reg_data = {}
+                            time.sleep(1)
+                        else:
+                            st.error("❌ Registration failed. Please try again.")
                 else:
                     st.error("Invalid code.")
             if st.button("Back"):
@@ -651,7 +661,7 @@ elif not st.session_state.current_event:
             
             if submitted:
                 if event_name:
-                    with st.spinner("Creating event..."):
+                    with st.spinner("🎉 Creating your event..."):
                         # Generate unique event ID using timestamp
                         import time
                         event_id = f"event_{int(time.time() * 1000)}"
@@ -696,7 +706,7 @@ elif not st.session_state.current_event:
             
             if submitted:
                 if code_input:
-                    with st.spinner("Joining event..."):
+                    with st.spinner("🤝 Joining event..."):
                         # Find event with matching code
                         matching_event = None
                         # get_event_by_access_code imported at top
@@ -956,7 +966,7 @@ else:
             
             if submitted:
                 if title and involved:
-                    with st.spinner("Saving expense..."):
+                    with st.spinner("💰 Saving expense..."):
                         # Logic to determine final amounts
                         final_amount = 0.0
                         original_amt = None
@@ -1149,7 +1159,7 @@ else:
                     
                     if submitted:
                         if new_title and new_involved: # Added this check back for form validation
-                            with st.spinner("Updating expense..."):
+                            with st.spinner("✏️ Updating expense..."):
                                 # Logic to determine final amounts
                                 final_amount = 0.0
                                 original_amt = None
@@ -1200,7 +1210,7 @@ else:
                 
                 # Delete button is now outside the form
                 if st.button("🗑️ Delete Expense"):
-                    with st.spinner("Deleting expense..."):
+                    with st.spinner("🗑️ Deleting expense..."):
                         from database import delete_expense
                         if delete_expense(selected_expense['id']):
                             st.success("Expense deleted successfully!")
@@ -1368,7 +1378,7 @@ else:
                 submitted = st.form_submit_button("💾 Record Payment", type="primary")
                 
                 if submitted:
-                    with st.spinner("Recording payment..."):
+                    with st.spinner("💳 Recording payment..."):
                         # Create settlement record
                         settlement_data = {
                             "payer": payer,
@@ -1524,7 +1534,7 @@ else:
                 elif new_member_username in current_event['members']:
                     st.warning("User already in event.")
                 else:
-                    with st.spinner("Adding member..."):
+                    with st.spinner("👥 Adding member..."):
                         from database import add_event_member
                         if add_event_member(current_event['id'], new_member_username):
                             st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
@@ -1559,7 +1569,7 @@ else:
                     submitted = st.form_submit_button("Update Role", type="primary")
                     
                     if submitted:
-                        with st.spinner("Updating role..."):
+                        with st.spinner("👤 Updating role..."):
                             from database import update_member_role
                             if update_member_role(current_event['id'], selected_member, new_role):
                                 st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
@@ -1609,7 +1619,7 @@ else:
                 
                 if submitted:
                     if new_currency != current_currency:
-                        with st.spinner("Updating currency..."):
+                        with st.spinner("💱 Updating currency..."):
                             from database import update_event
                         if update_event(current_event['id'], {'currency': new_currency}):
                             st.session_state.data = load_data(st.session_state.current_user) # Reload data to reflect changes
