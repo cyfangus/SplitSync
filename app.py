@@ -1084,13 +1084,23 @@ else:
 
                 col_curr, col_mode = st.columns([1, 2])
                 with col_curr:
+                    # Find the index of the initial currency
+                    currency_list = list(currencies.keys())
+                    try:
+                        initial_index = currency_list.index(initial_currency)
+                    except ValueError:
+                        initial_index = currency_list.index(event_currency) if event_currency in currency_list else 0
+                    
                     new_currency = st.selectbox(
                         "Currency",
-                        options=list(currencies.keys()),
-                        index=list(currencies.keys()).index(initial_currency) if initial_currency in currencies else 0,
-                        format_func=lambda x: x,
+                        options=currency_list,
+                        index=initial_index,
+                        format_func=lambda x: currencies[x],
                         key="edit_exp_curr"
                     )
+                    # Show original currency as reference
+                    if initial_currency:
+                        st.caption(f"💡 Original: {currencies.get(initial_currency, initial_currency)}")
                 
                 conversion_mode = "Auto"
                 if new_currency != event_currency:
@@ -1101,8 +1111,22 @@ else:
                             horizontal=True,
                             key="edit_exp_mode"
                         )
+                
+                # Show current expense summary
+                with st.expander("📋 Current Expense Details", expanded=False):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Title:** {selected_expense['title']}")
+                        st.write(f"**Amount:** {format_expense_display(selected_expense)}")
+                        st.write(f"**Paid By:** {selected_expense['payer']}")
+                        st.write(f"**Date:** {selected_expense['date']}")
+                    with col2:
+                        st.write(f"**Category:** {selected_expense.get('category', 'N/A')}")
+                        st.write(f"**Split Among:** {', '.join(selected_expense.get('involved', current_event['members']))}")
+                        st.write(f"**Status:** {'✓ Settled' if selected_expense.get('settled', False) else '⏳ Pending'}")
 
                 with st.form("edit_expense_form"):
+                    st.caption("✏️ Edit the fields below (pre-filled with current values)")
                     new_title = st.text_input("Description", value=selected_expense['title'])
                     
                     # Dynamic Inputs
