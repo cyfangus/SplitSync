@@ -1272,22 +1272,15 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
             
             payer = st.selectbox("Paid By", current_event['members'], index=current_event['members'].index(st.session_state.current_user) if st.session_state.current_user in current_event['members'] else 0)
             
-            # Category selection with option to add custom
-            col_cat1, col_cat2 = st.columns([3, 1])
-            with col_cat1:
-                category = st.selectbox("Category", all_categories, help="Select from default categories or add your own below")
-            with col_cat2:
-                st.write("")  # Spacer
-                st.write("")  # Spacer
-                if st.button("➕ Custom", help="Add a custom category"):
-                    st.session_state.show_custom_category = True
+            # Category selection
+            category = st.selectbox("Category", all_categories, help="Select a category or enter a custom one below")
             
-            # Custom category input
-            if st.session_state.get('show_custom_category', False):
-                custom_cat = st.text_input("Enter custom category name", placeholder="e.g., Pet Supplies")
-                if custom_cat:
-                    category = f"🏷️ {custom_cat}"
-                    st.session_state.show_custom_category = False
+            # Optional custom category override
+            custom_category = st.text_input("Or enter custom category (optional)", placeholder="e.g., Pet Supplies", help="Leave blank to use selected category above")
+            
+            # Use custom category if provided, otherwise use selected
+            if custom_category.strip():
+                category = f"🏷️ {custom_category.strip()}"
             
             involved = st.multiselect("Split Among", current_event['members'], default=current_event['members'])
             date = st.date_input("Date", datetime.today())
