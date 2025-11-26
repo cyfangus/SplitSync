@@ -30,7 +30,7 @@ def load_data(current_user=None):
 
     try:
         # Load users (public info only) - only if needed
-        users_response = supabase.table('users').select("username, email, avatar").execute()
+        users_response = supabase.table('users').select("username, email, avatar, display_name").execute()
         users = users_response.data if users_response.data else []
 
         # If no user is logged in, return minimal data

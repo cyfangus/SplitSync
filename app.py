@@ -270,6 +270,14 @@ def validate_password(password):
         return False, "Password must contain at least one special character."
     return True, ""
 
+def get_display_name(username):
+    """Get display name for a username, falling back to username."""
+    if 'data' in st.session_state and 'users' in st.session_state.data:
+        user = next((u for u in st.session_state.data['users'] if u['username'] == username), None)
+        if user and user.get('display_name'):
+            return user['display_name']
+    return username
+
 # --- Session State Initialization ---
 if 'data' not in st.session_state:
     with st.spinner("🔄 Loading your data..."):
@@ -366,6 +374,7 @@ if not st.session_state.current_user:
             with st.form("reg_form_1"):
                 new_username = st.text_input("Choose Username")
                 st.caption("📝 Min 3 chars. Letters, numbers, and underscores only. No spaces.")
+                new_display_name = st.text_input("Display Name (Optional)", placeholder="e.g. John Doe")
                 new_email = st.text_input("Email Address")
                 new_password = st.text_input("Choose Password", type="password")
                 st.caption("🔒 Min 8 chars. Must include uppercase, lowercase, number, and special char.")
@@ -397,7 +406,8 @@ if not st.session_state.current_user:
                                     st.session_state.reg_data = {
                                         "username": new_username,
                                         "email": new_email,
-                                        "password": hash_password(new_password)
+                                        "password": hash_password(new_password),
+                                        "display_name": new_display_name if new_display_name else new_username
                                     }
                                     st.session_state.reg_step = 2
                                     time.sleep(0.5)
@@ -630,6 +640,22 @@ elif not st.session_state.current_event:
                             st.error(f"Error updating password: {e}")
         
         with col2:
+            st.subheader("Profile Settings")
+            
+            # Display Name Form
+            current_display_name = get_display_name(st.session_state.current_user)
+            with st.form("change_display_name"):
+                new_display_name = st.text_input("Display Name", value=current_display_name)
+                if st.form_submit_button("Update Display Name"):
+                    if new_display_name:
+                        if update_user(st.session_state.current_user, {'display_name': new_display_name}):
+                            st.success("✅ Display name updated!")
+                            st.rerun()
+                    else:
+                        st.error("Display name cannot be empty.")
+            
+            st.divider()
+
             st.subheader("Change Username")
             st.warning("⚠️ Changing your username will update it across all past events and expenses.")
             with st.form("change_username"):
@@ -731,8 +757,9 @@ elif not st.session_state.current_event:
             recent_event = my_events[0]  # Show most recent
             with st.container():
                 st.markdown(f"**{recent_event['name']}**")
-                st.caption(f"Members: {', '.join(recent_event['members'][:3])}" + 
-                          (f" +{len(recent_event['members'])-3} more" if len(recent_event['members']) > 3 else ""))
+                member_names = [get_display_name(m) for m in recent_event['members']]
+                st.caption(f"Members: {', '.join(member_names[:3])}" + 
+                          (f" +{len(member_names)-3} more" if len(member_names) > 3 else ""))
                 if st.button("Open", key="open_recent"):
                     st.session_state.current_event = recent_event
                     st.rerun()
@@ -756,7 +783,8 @@ elif not st.session_state.current_event:
                     c1, c2 = st.columns([3, 1])
                     with c1:
                         st.subheader(event['name'])
-                        st.caption(f"Members: {', '.join(event['members'])}")
+                        member_names = [get_display_name(m) for m in event['members']]
+                        st.caption(f"Members: {', '.join(member_names)}")
                     with c2:
                         if st.button("Open", key=f"open_{event['id']}"):
                             st.session_state.current_event = event
@@ -989,7 +1017,8 @@ else:
         # Display user and role
         user_role = current_event.get('roles', {}).get(st.session_state.current_user, 'member')
         role_emoji = "👑" if user_role == "admin" else "👤"
-        st.caption(f"{role_emoji} {st.session_state.current_user} ({user_role.title()})")
+        display_name = get_display_name(st.session_state.current_user)
+        st.caption(f"{role_emoji} {display_name} ({user_role.title()})")
         
         # Display Access Code
         code = current_event.get('access_code', 'N/A')
@@ -1039,7 +1068,9 @@ else:
             if debts:
                 st.subheader("⚠️ Who Owes Who")
                 for debt in debts:
-                    st.info(f"**{debt['debtor']}** owes **{debt['creditor']}**: {format_currency(debt['amount'])}")
+                    debtor_name = get_display_name(debt['debtor'])
+                    creditor_name = get_display_name(debt['creditor'])
+                    st.info(f"**{debtor_name}** owes **{creditor_name}**: {format_currency(debt['amount'])}")
             else:
                 st.success("✅ All settled up!")
                 
@@ -1059,8 +1090,13 @@ else:
 
             st.subheader("Recent Transactions")
             display_df = df.copy()
+            # Map payer to display name
+            display_df['payer'] = display_df['payer'].apply(get_display_name)
+            
             if 'involved' in display_df.columns:
-                display_df['involved'] = display_df['involved'].apply(lambda x: ", ".join(x) if isinstance(x, list) else "All")
+                display_df['involved'] = display_df['involved'].apply(
+                    lambda x: ", ".join([get_display_name(u) for u in x]) if isinstance(x, list) else "All"
+                )
             
             # Add formatted amount column
             display_df['display_amount'] = display_df.apply(format_expense_display, axis=1)
