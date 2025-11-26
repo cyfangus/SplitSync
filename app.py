@@ -300,8 +300,12 @@ if 'reset_email' not in st.session_state:
     st.session_state.reset_email = None
 
 # Reload data with current user context for security
-with st.spinner("🔄 Refreshing data..."):
-    data = st.session_state.data = load_data(current_user=st.session_state.get('current_user'))
+if st.session_state.get('current_user'):
+    with st.spinner("🔄 Refreshing data..."):
+        data = st.session_state.data = load_data(current_user=st.session_state.get('current_user'))
+else:
+    # Load minimal data when not logged in (just for user list)
+    data = st.session_state.data = load_data(current_user=None)
 
 # --- Auto-login from query params ---
 query_params = st.query_params
