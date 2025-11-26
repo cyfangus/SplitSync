@@ -997,6 +997,32 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
         
     current_event = data['events'][current_event_idx]
     
+    # Comprehensive Category System
+    DEFAULT_CATEGORIES = {
+        "🍔 Food & Dining": ["Restaurant", "Groceries", "Fast Food", "Cafe", "Delivery"],
+        "🚗 Transportation": ["Gas/Fuel", "Public Transit", "Taxi/Uber", "Parking", "Car Maintenance"],
+        "🏠 Housing": ["Rent", "Utilities", "Internet", "Furniture", "Home Supplies"],
+        "🎬 Entertainment": ["Movies", "Concerts", "Games", "Streaming", "Hobbies"],
+        "🛍️ Shopping": ["Clothing", "Electronics", "Books", "Gifts", "Personal Care"],
+        "💊 Health": ["Medical", "Pharmacy", "Gym", "Wellness", "Insurance"],
+        "✈️ Travel": ["Flights", "Hotels", "Activities", "Souvenirs", "Visa/Fees"],
+        "📚 Education": ["Tuition", "Books", "Courses", "Supplies", "Software"],
+        "💼 Work": ["Office Supplies", "Equipment", "Professional Development"],
+        "🎉 Events": ["Parties", "Celebrations", "Weddings", "Birthdays"],
+        "🐾 Pets": ["Food", "Vet", "Supplies", "Grooming"],
+        "💰 Other": ["Miscellaneous", "Uncategorized"]
+    }
+    
+    # Get custom categories from event (if any)
+    custom_categories = current_event.get('custom_categories', [])
+    
+    # Combine default and custom categories
+    all_categories = []
+    for main_cat, subcats in DEFAULT_CATEGORIES.items():
+        all_categories.append(main_cat)
+        all_categories.extend([f"  → {sub}" for sub in subcats])
+    all_categories.extend(custom_categories)
+    
     # Helper function to check if current user is admin
     def is_admin():
         roles = current_event.get('roles', {})
@@ -1243,8 +1269,26 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
                     with c2:
                         amount_in_base = st.number_input(f"Equivalent ({event_currency})", min_value=0.01)
                 
+            
             payer = st.selectbox("Paid By", current_event['members'], index=current_event['members'].index(st.session_state.current_user) if st.session_state.current_user in current_event['members'] else 0)
-            category = st.selectbox("Category", ["Food", "Transport", "Accommodation", "Entertainment", "Utilities", "Other"])
+            
+            # Category selection with option to add custom
+            col_cat1, col_cat2 = st.columns([3, 1])
+            with col_cat1:
+                category = st.selectbox("Category", all_categories, help="Select from default categories or add your own below")
+            with col_cat2:
+                st.write("")  # Spacer
+                st.write("")  # Spacer
+                if st.button("➕ Custom", help="Add a custom category"):
+                    st.session_state.show_custom_category = True
+            
+            # Custom category input
+            if st.session_state.get('show_custom_category', False):
+                custom_cat = st.text_input("Enter custom category name", placeholder="e.g., Pet Supplies")
+                if custom_cat:
+                    category = f"🏷️ {custom_cat}"
+                    st.session_state.show_custom_category = False
+            
             involved = st.multiselect("Split Among", current_event['members'], default=current_event['members'])
             date = st.date_input("Date", datetime.today())
             
@@ -1445,13 +1489,12 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
                     new_payer = st.selectbox("Paid By", current_event['members'], index=payer_idx)
                     
                     # Get current category index
-                    categories = ["Food", "Transport", "Accommodation", "Entertainment", "Utilities", "Other"]
                     try:
-                        cat_idx = categories.index(selected_expense['category'])
+                        cat_idx = all_categories.index(selected_expense['category'])
                     except ValueError:
                         cat_idx = 0
                     
-                    new_category = st.selectbox("Category", categories, index=cat_idx)
+                    new_category = st.selectbox("Category", all_categories, index=cat_idx)
                     
                     # Handle involved members
                     current_involved = selected_expense.get('involved', current_event['members'])
