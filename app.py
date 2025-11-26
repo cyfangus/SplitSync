@@ -1315,29 +1315,50 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
             # Smart Category Prediction
             predicted_category = predict_category(title) if title else all_categories[0]
             
-            # Show prediction hint
+            # Auto-categorization with optional override
+            st.markdown("### 🤖 Smart Categorization")
+            
             if title:
-                st.info(f"💡 Smart suggestion: **{predicted_category}**")
+                st.success(f"✨ **Auto-categorized as:** {predicted_category}")
+                st.caption("This will be used automatically. Expand below to change if needed.")
+            else:
+                st.info("💡 Type a description above and we'll auto-categorize it for you!")
             
-            # Category selection with smart default
-            try:
-                default_index = all_categories.index(predicted_category)
-            except ValueError:
-                default_index = 0
+            # Collapsible manual override
+            with st.expander("🔧 Manually select category (optional)", expanded=False):
+                st.caption("Only use this if you want to override the auto-suggestion")
+                
+                # Manual category selection
+                try:
+                    default_index = all_categories.index(predicted_category)
+                except ValueError:
+                    default_index = 0
+                
+                manual_category = st.selectbox(
+                    "Choose category", 
+                    all_categories, 
+                    index=default_index,
+                    key="manual_cat_select"
+                )
+                
+                # Custom category option
+                custom_category = st.text_input(
+                    "Or enter custom category", 
+                    placeholder="e.g., Pet Supplies",
+                    key="custom_cat_input"
+                )
+                
+                # Determine final category based on user input
+                if custom_category.strip():
+                    category = f"🏷️ {custom_category.strip()}"
+                elif manual_category != predicted_category:
+                    category = manual_category
+                else:
+                    category = predicted_category
             
-            category = st.selectbox(
-                "Category", 
-                all_categories, 
-                index=default_index,
-                help="Auto-suggested based on description. Change if needed."
-            )
-            
-            # Optional custom category override
-            custom_category = st.text_input("Or enter custom category (optional)", placeholder="e.g., Pet Supplies", help="Leave blank to use selected category above")
-            
-            # Use custom category if provided, otherwise use selected
-            if custom_category.strip():
-                category = f"🏷️ {custom_category.strip()}"
+            # If expander not opened/used, use predicted category
+            if not custom_category.strip() and (manual_category == predicted_category or 'manual_cat_select' not in locals()):
+                category = predicted_category
             
             involved = st.multiselect("Split Among", current_event['members'], default=current_event['members'])
             date = st.date_input("Date", datetime.today())
