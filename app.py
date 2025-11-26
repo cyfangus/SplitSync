@@ -1916,13 +1916,13 @@ Thanks!
 
                 # 2. Spending Over Time
                 st.subheader("Spending Over Time")
-                # Group by date and category
-                # Ensure date is datetime
+                # Group by date only (total spending per day)
                 df['date_dt'] = pd.to_datetime(df['date'])
-                df_daily = df.groupby(['date_dt', 'category'])['amount'].sum().reset_index()
-                fig_time = px.line(df_daily, x='date_dt', y='amount', color='category', 
-                                   title='Daily Spending Trend by Category',
+                df_daily = df.groupby('date_dt')['amount'].sum().reset_index()
+                fig_time = px.line(df_daily, x='date_dt', y='amount', 
+                                   title='Daily Total Spending',
                                    markers=True)
+                fig_time.update_traces(line_color='#1f77b4', line_width=3)
                 st.plotly_chart(fig_time, use_container_width=True)
                 
         with tab_export:
