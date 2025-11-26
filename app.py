@@ -1292,22 +1292,80 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
         with st.form("add_expense", clear_on_submit=True):
             title = st.text_input("Description")
             
-            # Dynamic Inputs
+            # Dynamic Inputs with Formula Support
             amount_in_base = 0.0
             amount_in_original = 0.0
             
+            # Helper function to evaluate math expressions safely
+            def safe_eval_formula(formula_str):
+                """Safely evaluate a math formula string."""
+                if not formula_str:
+                    return 0.0
+                
+                # Remove whitespace
+                formula_str = formula_str.strip()
+                
+                # If it's already a number, return it
+                try:
+                    return float(formula_str)
+                except ValueError:
+                    pass
+                
+                # Try to evaluate as a formula
+                try:
+                    # Only allow safe characters: digits, operators, parentheses, decimal point
+                    import re
+                    if re.match(r'^[\d\s\+\-\*\/\(\)\.]+$', formula_str):
+                        result = eval(formula_str)
+                        return float(result)
+                    else:
+                        return 0.0
+                except:
+                    return 0.0
+            
             if selected_currency == event_currency:
-                amount_in_base = st.number_input(f"Amount ({event_currency})", min_value=0.01)
+                st.caption("💡 **Tip:** You can type math formulas! e.g., `12.50 * 3 + 5`")
+                col_amt, col_calc = st.columns([2, 1])
+                with col_amt:
+                    amount_formula = st.text_input(
+                        f"Amount ({event_currency})", 
+                        placeholder="e.g., 12.50 * 3 + 5",
+                        help="Enter a number or formula (e.g., 3.7+6.5, 15*3, (10+5)/2)"
+                    )
+                    amount_in_base = safe_eval_formula(amount_formula)
+                with col_calc:
+                    if amount_formula and amount_in_base > 0:
+                        st.metric("Calculated", f"{amount_in_base:.2f}")
+                    else:
+                        st.write("")  # Spacer
             else:
+                st.caption("💡 **Tip:** Math formulas supported! e.g., `10 + 5`")
                 if conversion_mode == "Auto (Market Rate)":
-                    amount_in_original = st.number_input(f"Amount ({selected_currency})", min_value=0.01)
+                    col_amt, col_calc = st.columns([2, 1])
+                    with col_amt:
+                        amount_formula_orig = st.text_input(
+                            f"Amount ({selected_currency})", 
+                            placeholder="e.g., 3.7+6.5",
+                            help="Enter a number or formula"
+                        )
+                        amount_in_original = safe_eval_formula(amount_formula_orig)
+                    with col_calc:
+                        if amount_formula_orig and amount_in_original > 0:
+                            st.metric("Calculated", f"{amount_in_original:.2f}")
                     st.caption(f"Will be converted to {event_currency} on submit.")
                 else:
                     c1, c2 = st.columns(2)
                     with c1:
-                        amount_in_original = st.number_input(f"Spent ({selected_currency})", min_value=0.01)
+                        amt_orig_formula = st.text_input(f"Spent ({selected_currency})", placeholder="e.g. 10+5")
+                        amount_in_original = safe_eval_formula(amt_orig_formula)
+                        if amt_orig_formula and amount_in_original > 0:
+                            st.caption(f"= {amount_in_original:.2f}")
+                            
                     with c2:
-                        amount_in_base = st.number_input(f"Equivalent ({event_currency})", min_value=0.01)
+                        amt_base_formula = st.text_input(f"Equivalent ({event_currency})", placeholder="e.g. 15*0.9")
+                        amount_in_base = safe_eval_formula(amt_base_formula)
+                        if amt_base_formula and amount_in_base > 0:
+                            st.caption(f"= {amount_in_base:.2f}")
                 
             
             payer = st.selectbox("Paid By", current_event['members'], index=current_event['members'].index(st.session_state.current_user) if st.session_state.current_user in current_event['members'] else 0)
