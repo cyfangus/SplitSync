@@ -359,8 +359,8 @@ if not st.session_state.current_user:
                                 # Clear cache and reload fresh data for the logged‑in user
                                 load_data.clear()
                                 st.session_state.data = load_data(current_user=user['username'])
-                                # Show events automatically after login
-                                st.session_state.show_events = True
+                                # Show home page after login (not events list)
+                                st.session_state.show_events = False
                                 time.sleep(0.5)  # Brief pause to show success message
                                 st.rerun()
                             else:
