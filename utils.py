@@ -1,90 +1,114 @@
+"""
+Utility functions for SplitSync
+Extracted for testability
+"""
+import bcrypt
 import re
 
-def parse_group_info(text):
+
+def hash_password(password):
+    """Hash a password using bcrypt."""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def verify_password(password, hashed):
+    """Verify a password against a bcrypt hash."""
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
+
+
+def validate_password(password):
     """
-    Parses text (like WhatsApp group info) to extract potential event name and members.
-    
-    Args:
-        text (str): The raw text to parse.
-        
-    Returns:
-        dict: A dictionary containing 'name' (str) and 'members' (list).
+    Validate password strength.
+    Returns (is_valid, error_message)
     """
-    info = {
-        "name": "",
-        "members": []
-    }
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
+    if not re.search(r"[0-9]", password):
+        return False, "Password must contain at least one number."
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character."
+    return True, ""
+
+
+def calculate_debts(expenses, members):
+    """
+    Calculate who owes whom based on expenses.
+    Returns list of debts: [{'debtor': str, 'creditor': str, 'amount': float}]
+    """
+    # Filter out settled expenses
+    unsettled = [e for e in expenses if not e.get('settled', False)]
     
-    if not text:
-        return info
+    if not unsettled:
+        return []
+    
+    # Calculate balances for each member
+    balances = {member: 0.0 for member in members}
+    
+    for expense in unsettled:
+        payer = expense['payer']
+        amount = expense['amount']
+        involved = expense.get('involved', members)
         
-    lines = text.split('\n')
-    
-    # 1. Try to find Group Name
-    # Heuristic: First non-empty line that doesn't look like a phone number, date, or system message
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        # Skip lines that look like dates or system messages
-        if re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', line): # Date
-            continue
+        if not involved:
+            involved = members
         
-        line_lower = line.lower()
-        if any(x in line_lower for x in ["created group", "added you", "messages are end-to-end encrypted", "security code", "changed the subject", "group info"]):
-            continue
-            
-        # If we find a line that seems to be a title (not too long, no numbers at start)
-        if len(line) < 50 and not re.match(r'^[\+0-9]', line):
-            info["name"] = line
-            break
-            
-    # 2. Try to find Members
-    # Heuristic: Look for names or phone numbers in comma-separated lists or new lines
-    # WhatsApp often lists members like: "+1 234-567-890, John, Sarah, +44 7890 123456"
+        # Split amount equally among involved members
+        split_amount = amount / len(involved)
+        
+        # Payer gets credited
+        balances[payer] += amount
+        
+        # Each involved member gets debited their share
+        for person in involved:
+            balances[person] -= split_amount
     
-    # Normalize text to handle newlines as separators too if they look like a list
-    # But be careful not to merge unrelated lines.
+    # Convert balances to debts
+    debts = []
+    creditors = [(person, bal) for person, bal in balances.items() if bal > 0.01]
+    debtors = [(person, -bal) for person, bal in balances.items() if bal < -0.01]
     
-    # Regex for potential names/numbers
-    # Matches:
-    # - Phone numbers: +1 234 567 8900
-    # - Names: John Doe, Sarah
-    # - Excludes: "You", "Group info", dates
+    # Match debtors with creditors
+    for debtor, debt_amount in debtors:
+        for creditor, credit_amount in creditors:
+            if debt_amount > 0.01 and credit_amount > 0.01:
+                payment = min(debt_amount, credit_amount)
+                debts.append({
+                    'debtor': debtor,
+                    'creditor': creditor,
+                    'amount': round(payment, 2)
+                })
+                debt_amount -= payment
+                credit_amount -= payment
+                # Update the creditor's remaining credit
+                creditors = [(c, amt - payment if c == creditor else amt) 
+                            for c, amt in creditors]
     
-    # Strategy: Split by commas and newlines, then clean up
-    tokens = re.split(r'[,\n]', text)
+    return debts
+
+
+def calculate_settlements(debts):
+    """
+    Convert debts into settlement instructions.
+    Returns list of settlements: [{'from_user': str, 'to_user': str, 'amount': float}]
+    """
+    if not debts:
+        return []
     
-    potential_members = []
-    for token in tokens:
-        token = token.strip()
-        if not token:
-            continue
-            
-        # Filter out common junk
-        token_lower = token.lower()
-        if token_lower in ["you", "admin", "group info", "created by", "messages", "search"]:
-            continue
-            
-        if any(x in token_lower for x in ["created group", "added you", "messages are end-to-end encrypted", "security code"]):
-            continue
-            
-        # If it's the group name we found earlier, skip it
-        if token == info["name"]:
-            continue
-            
-        # If it looks like a date/time, skip
-        if re.search(r'\d{1,2}:\d{2}', token) or re.search(r'\d{1,2}/\d{1,2}', token):
-            continue
-            
-        # If it's reasonably short (name) or looks like a phone number
-        if len(token) < 30:
-            # Clean up phone numbers to just digits/plus for consistency if needed
-            # For now, keep as is for display
-            potential_members.append(token)
-            
-    # Remove duplicates
-    info["members"] = list(set(potential_members))
+    # For now, just convert debts to settlements directly
+    # A more sophisticated algorithm could minimize the number of transactions
+    settlements = []
+    for debt in debts:
+        settlements.append({
+            'from_user': debt['debtor'],
+            'to_user': debt['creditor'],
+            'amount': debt['amount']
+        })
     
-    return info
+    return settlements
