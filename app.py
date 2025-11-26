@@ -1898,32 +1898,96 @@ Thanks!
             if df.empty:
                 st.info("No expenses to analyze yet.")
             else:
-                col1, col2 = st.columns(2)
+                # Filter Controls
+                st.markdown("### 🔍 Filters")
+                with st.expander("Filter Options", expanded=False):
+                    filter_col1, filter_col2, filter_col3 = st.columns(3)
+                    
+                    with filter_col1:
+                        # Date Range Filter
+                        df['date_dt'] = pd.to_datetime(df['date'])
+                        min_date = df['date_dt'].min().date()
+                        max_date = df['date_dt'].max().date()
+                        
+                        date_range = st.date_input(
+                            "Date Range",
+                            value=(min_date, max_date),
+                            min_value=min_date,
+                            max_value=max_date,
+                            help="Select start and end dates"
+                        )
+                    
+                    with filter_col2:
+                        # Payer Filter
+                        all_payers = df['payer'].unique().tolist()
+                        selected_payers = st.multiselect(
+                            "Payers",
+                            options=all_payers,
+                            default=all_payers,
+                            help="Select members to include"
+                        )
+                    
+                    with filter_col3:
+                        # Category Filter
+                        all_categories = df['category'].unique().tolist()
+                        selected_categories = st.multiselect(
+                            "Categories",
+                            options=all_categories,
+                            default=all_categories,
+                            help="Select categories to include"
+                        )
                 
-                with col1:
-                    # 1. Spending by Category
-                    st.subheader("Spending by Category")
-                    fig_cat = px.pie(df, values='amount', names='category', title='Total Spending by Category', hole=0.4)
-                    st.plotly_chart(fig_cat, use_container_width=True)
+                # Apply Filters
+                df_filtered = df.copy()
                 
-                with col2:
-                    # 3. Spending by Member
-                    st.subheader("Spending by Member")
-                    # Need to calculate total spent by each payer
-                    payer_stats = df.groupby('payer')['amount'].sum().reset_index()
-                    fig_payer = px.bar(payer_stats, x='payer', y='amount', color='payer', title='Total Spent by Member')
-                    st.plotly_chart(fig_payer, use_container_width=True)
+                # Date filter
+                if len(date_range) == 2:
+                    start_date, end_date = date_range
+                    df_filtered = df_filtered[
+                        (df_filtered['date_dt'].dt.date >= start_date) & 
+                        (df_filtered['date_dt'].dt.date <= end_date)
+                    ]
+                
+                # Payer filter
+                if selected_payers:
+                    df_filtered = df_filtered[df_filtered['payer'].isin(selected_payers)]
+                
+                # Category filter
+                if selected_categories:
+                    df_filtered = df_filtered[df_filtered['category'].isin(selected_categories)]
+                
+                # Show filtered results count
+                st.caption(f"Showing {len(df_filtered)} of {len(df)} expenses")
+                st.divider()
+                
+                if df_filtered.empty:
+                    st.warning("No expenses match the selected filters.")
+                else:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # 1. Spending by Category
+                        st.subheader("Spending by Category")
+                        fig_cat = px.pie(df_filtered, values='amount', names='category', 
+                                        title='Total Spending by Category', hole=0.4)
+                        st.plotly_chart(fig_cat, use_container_width=True)
+                    
+                    with col2:
+                        # 3. Spending by Member
+                        st.subheader("Spending by Member")
+                        payer_stats = df_filtered.groupby('payer')['amount'].sum().reset_index()
+                        fig_payer = px.bar(payer_stats, x='payer', y='amount', color='payer', 
+                                          title='Total Spent by Member')
+                        st.plotly_chart(fig_payer, use_container_width=True)
 
-                # 2. Spending Over Time
-                st.subheader("Spending Over Time")
-                # Group by date only (total spending per day)
-                df['date_dt'] = pd.to_datetime(df['date'])
-                df_daily = df.groupby('date_dt')['amount'].sum().reset_index()
-                fig_time = px.line(df_daily, x='date_dt', y='amount', 
-                                   title='Daily Total Spending',
-                                   markers=True)
-                fig_time.update_traces(line_color='#1f77b4', line_width=3)
-                st.plotly_chart(fig_time, use_container_width=True)
+                    # 2. Spending Over Time
+                    st.subheader("Spending Over Time")
+                    df_daily = df_filtered.groupby('date_dt')['amount'].sum().reset_index()
+                    fig_time = px.line(df_daily, x='date_dt', y='amount', 
+                                       title='Daily Total Spending',
+                                       markers=True)
+                    fig_time.update_traces(line_color='#1f77b4', line_width=3)
+                    st.plotly_chart(fig_time, use_container_width=True)
                 
         with tab_export:
             st.subheader("📥 Export Data")
