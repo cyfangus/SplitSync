@@ -1025,28 +1025,69 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
     
     # Smart Categorization Function
     def predict_category(description):
-        """Predict category based on expense description using keyword matching."""
+        """Predict category (and sub-category) based on description using advanced keyword matching."""
         if not description:
             return all_categories[0] if all_categories else "💰 Other"
         
         desc_lower = description.lower()
         
-        # Keyword mappings (main category → keywords)
-        keyword_map = {
-            "🍔 Food & Dining": ["restaurant", "food", "lunch", "dinner", "breakfast", "cafe", "coffee", "pizza", "burger", "sushi", "meal", "eat", "grocery", "groceries", "supermarket", "market", "delivery", "uber eats", "doordash", "grubhub"],
-            "🚗 Transportation": ["uber", "lyft", "taxi", "gas", "fuel", "petrol", "parking", "metro", "subway", "bus", "train", "flight", "airline", "car", "vehicle", "transport"],
-            "🏠 Housing": ["rent", "utilities", "electric", "water", "internet", "wifi", "furniture", "ikea", "home depot", "cleaning", "maintenance"],
-            "🎬 Entertainment": ["movie", "cinema", "concert", "show", "netflix", "spotify", "game", "gaming", "steam", "playstation", "xbox", "hobby", "fun"],
-            "🛍️ Shopping": ["amazon", "shop", "store", "clothes", "clothing", "shoes", "mall", "target", "walmart", "electronics", "book", "gift"],
-            "💊 Health": ["doctor", "hospital", "pharmacy", "medicine", "medical", "gym", "fitness", "health", "dental", "dentist", "insurance"],
-            "✈️ Travel": ["hotel", "airbnb", "flight", "airport", "vacation", "trip", "travel", "tour", "ticket", "visa", "souvenir"],
-            "📚 Education": ["tuition", "school", "university", "course", "class", "book", "textbook", "udemy", "coursera", "education"],
-            "💼 Work": ["office", "supplies", "laptop", "computer", "software", "subscription", "work", "business"],
-            "🎉 Events": ["party", "birthday", "wedding", "celebration", "event", "gift", "present"],
-            "🐾 Pets": ["pet", "dog", "cat", "vet", "veterinary", "pet food", "grooming"],
+        # 1. Sub-category specific matching (More specific = Higher priority)
+        # Maps keywords directly to the formatted sub-category string
+        subcategory_map = {
+            # Food
+            "  → Restaurant": ["restaurant", "dinner", "lunch", "bistro", "steakhouse", "sushi", "buffet", "dining", "nando", "wagamama", "pizza express", "zizzi", "wetherspoon", "pub", "sunday roast", "curry"],
+            "  → Fast Food": ["mcdonald", "burger", "kfc", "taco", "pizza", "subway", "fries", "fast food", "chipotle", "greggs", "five guys", "domino", "papa john", "chicken shop"],
+            "  → Cafe": ["coffee", "starbucks", "latte", "cafe", "tea", "dunkin", "espresso", "bakery", "costa", "nero", "pret", "gail", "leon"],
+            "  → Groceries": ["grocery", "groceries", "supermarket", "market", "whole foods", "trader joe", "safeway", "kroger", "walmart", "costco", "fruit", "veg", "tesco", "sainsbury", "asda", "waitrose", "m&s", "marks and spencer", "morrison", "aldi", "lidl", "co-op", "iceland", "ocado"],
+            "  → Delivery": ["uber eats", "doordash", "grubhub", "delivery", "postmates", "takeout", "deliveroo", "just eat", "hungry panda"],
+            
+            # Transport
+            "  → Taxi/Uber": ["uber", "lyft", "taxi", "cab", "ride", "grab", "bolt", "black cab", "minicab"],
+            "  → Flights": ["flight", "airline", "ticket", "delta", "united", "american air", "airport", "plane", "ba", "british airways", "easyjet", "ryanair", "virgin", "heathrow", "gatwick", "stansted", "luton", "city airport"],
+            "  → Public Transit": ["bus", "train", "subway", "metro", "bart", "ticket", "pass", "transit", "tube", "tfl", "underground", "oyster", "contactless", "national rail", "trainline", "gwr", "lner", "southeastern", "thameslink", "dlr", "tram"],
+            "  → Gas/Fuel": ["gas", "fuel", "petrol", "shell", "chevron", "bp", "station", "esso", "texaco"],
+            
+            # Housing
+            "  → Utilities": ["electric", "water", "gas bill", "utility", "power", "internet", "wifi", "broadband", "british gas", "octopus", "scottish power", "thames water", "council tax", "tv license", "bt", "virgin media", "sky"],
+            "  → Rent": ["rent", "lease", "housing", "landlord", "deposit"],
+            
+            # Entertainment
+            "  → Movies": ["movie", "cinema", "film", "theatre", "theater", "imax", "amc", "odeon", "vue", "cineworld", "everyman"],
+            "  → Streaming": ["netflix", "spotify", "hulu", "disney", "hbo", "subscription", "youtube", "prime video", "now tv", "apple tv"],
+            "  → Games": ["game", "steam", "playstation", "xbox", "nintendo", "gaming"],
+            
+            # Shopping
+            "  → Electronics": ["apple", "best buy", "tech", "phone", "laptop", "computer", "cable", "charger", "currys", "pc world", "argos"],
+            "  → Clothing": ["clothes", "shirt", "pants", "dress", "shoes", "nike", "adidas", "zara", "uniqlo", "wear", "primark", "next", "asos", "jd sports", "sports direct", "tk maxx", "john lewis", "selfridges"],
+            
+            # Travel
+            "  → Hotels": ["hotel", "airbnb", "motel", "stay", "resort", "booking", "hostel", "premier inn", "travelodge", "holiday inn"],
+            
+            # Health
+            "  → Gym": ["gym", "fitness", "workout", "yoga", "crossfit", "membership", "puregym", "the gym", "virgin active", "david lloyd"],
+            "  → Pharmacy": ["pharmacy", "cvs", "walgreens", "drug", "medicine", "pill", "boots", "superdrug", "lloyds", "nhs", "prescription"],
         }
         
-        # Check for keyword matches
+        # Check specific sub-categories first
+        for subcat, keywords in subcategory_map.items():
+            if any(k in desc_lower for k in keywords):
+                return subcat
+
+        # 2. Fallback to Main Category matching
+        keyword_map = {
+            "🍔 Food & Dining": ["food", "meal", "eat", "snack", "drink"],
+            "🚗 Transportation": ["transport", "car", "vehicle", "parking", "toll"],
+            "🏠 Housing": ["home", "house", "apartment", "furniture", "cleaning"],
+            "🎬 Entertainment": ["fun", "hobby", "ticket", "show", "concert"],
+            "🛍️ Shopping": ["shop", "store", "buy", "gift", "amazon"],
+            "💊 Health": ["doctor", "medical", "health", "dentist", "insurance"],
+            "✈️ Travel": ["travel", "trip", "vacation", "visa", "passport"],
+            "📚 Education": ["school", "class", "course", "book", "tuition"],
+            "💼 Work": ["work", "office", "business"],
+            "🎉 Events": ["party", "birthday", "wedding", "celebration"],
+            "🐾 Pets": ["pet", "dog", "cat", "vet"],
+        }
+        
         best_match = None
         max_matches = 0
         
@@ -1056,11 +1097,9 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
                 max_matches = matches
                 best_match = category
         
-        # Return best match or default
         if best_match and best_match in all_categories:
             return best_match
         
-        # Default to first category
         return all_categories[0] if all_categories else "💰 Other"
     
     # Helper function to check if current user is admin
