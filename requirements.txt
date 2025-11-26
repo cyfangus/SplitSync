@@ -6,6 +6,8 @@ Pillow
 supabase
 bcrypt
 python-telegram-bot
+reportlab>=4.0.0
+streamlit-autorefresh
 
 # Testing dependencies
 pytest>=7.4.0
