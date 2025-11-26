@@ -952,7 +952,8 @@ if st.session_state.get('current_user') and not st.session_state.current_event:
                     st.error("Please enter an access code.")
 
 # --- Main Event Dashboard ---
-else:
+# Only show if user is logged in AND an event is selected
+elif st.session_state.get('current_user') and st.session_state.current_event:
     # Get current event data (refresh from state)
     event_id = st.session_state.current_event['id']
     # Find the event in the data list to ensure we are editing the live object
