@@ -537,48 +537,53 @@ if st.session_state.get('current_user') and st.session_state.get('pending_invite
 # --- Event Selection Screen ---
 # Only show if user is logged in AND no event is selected
 if st.session_state.get('current_user') and not st.session_state.current_event:
-    # Get user data for avatar
-    current_user_data = next((u for u in data['users'] if u['username'] == st.session_state.current_user), None)
-    
-    if current_user_data and current_user_data.get('avatar'):
-        try:
-            avatar_bytes = base64.b64decode(current_user_data['avatar'])
-            st.sidebar.image(avatar_bytes, width=100)
-            st.sidebar.markdown(f"### {st.session_state.current_user}")
-        except:
-             st.sidebar.title(f"👤 {st.session_state.current_user}")
-    else:
-        st.sidebar.title(f"👤 {st.session_state.current_user}")
-    
-    # Initialize settings state
-    if 'show_settings' not in st.session_state:
-        st.session_state.show_settings = False
-    
-    # Refresh Button
-    col_ref1, col_ref2 = st.sidebar.columns([0.8, 0.2])
-    with col_ref1:
-        st.caption(f"Last updated: {datetime.now().strftime('%H:%M')}")
-    with col_ref2:
-        if st.button("🔄", key="refresh_home", help="Refresh Data"):
+    # --- Sidebar Design ---
+    with st.sidebar:
+        # 1. Profile Section
+        st.markdown("### 👤 Profile")
+        if current_user_data and current_user_data.get('avatar'):
+            try:
+                avatar_bytes = base64.b64decode(current_user_data['avatar'])
+                st.image(avatar_bytes, width=80)
+            except:
+                pass
+        
+        st.write(f"**{st.session_state.current_user}**")
+        st.caption("Logged in")
+        st.divider()
+
+        # 2. Navigation
+        st.markdown("### 🧭 Navigation")
+        
+        if st.button("🏠 My Events", use_container_width=True):
+            st.session_state.show_settings = False
+            st.session_state.show_events = True
             load_data.clear()
             st.rerun()
-            
-    if st.sidebar.button("🏠 My Events"):
-        st.session_state.show_settings = False
-        st.session_state.show_events = True  # Show events list
-        load_data.clear()  # Clear cache to show fresh events
-        st.rerun()
 
-    if st.sidebar.button("⚙️ Account Settings"):
-        st.session_state.show_settings = True
-        st.rerun()
+        if st.button("⚙️ Account Settings", use_container_width=True):
+            st.session_state.show_settings = True
+            st.rerun()
+            
+        st.divider()
         
-    if st.sidebar.button("Logout"):
-        st.session_state.current_user = None
-        st.session_state.show_settings = False
-        # Clear query param
-        st.query_params.clear()
-        st.rerun()
+        # 3. Footer Actions
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.current_user = None
+            st.session_state.show_settings = False
+            st.query_params.clear()
+            st.rerun()
+            
+        st.markdown("---")
+        
+        # Refresh Section
+        col_ref1, col_ref2 = st.columns([0.7, 0.3])
+        with col_ref1:
+            st.caption(f"Updated: {datetime.now().strftime('%H:%M')}")
+        with col_ref2:
+            if st.button("🔄", key="refresh_home", help="Refresh Data"):
+                load_data.clear()
+                st.rerun()
     
     if st.session_state.show_settings:
         st.title("⚙️ Account Settings")
@@ -1037,39 +1042,54 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
     
     # Sidebar
     with st.sidebar:
+        # 1. Header
         st.title("💸 SplitSync")
-        st.caption(f"Event: {current_event['name']}")
+        st.markdown(f"### {current_event['name']}")
         
-        # Display user and role
-        user_role = current_event.get('roles', {}).get(st.session_state.current_user, 'member')
-        role_emoji = "👑" if user_role == "admin" else "👤"
-        display_name = get_display_name(st.session_state.current_user)
-        st.caption(f"{role_emoji} {display_name} ({user_role.title()})")
+        # 2. Event Info Card
+        with st.container():
+            st.markdown("---")
+            # User Role
+            user_role = current_event.get('roles', {}).get(st.session_state.current_user, 'member')
+            role_emoji = "👑" if user_role == "admin" else "👤"
+            display_name = get_display_name(st.session_state.current_user)
+            st.write(f"{role_emoji} **{display_name}**")
+            st.caption(f"Role: {user_role.title()}")
+            
+            # Access Code
+            code = current_event.get('access_code', 'N/A')
+            st.code(code, language="text")
+            st.caption("Event Access Code")
+            
+            # Currency
+            currency_code = current_event.get('currency', 'USD')
+            currency_symbol = CURRENCY_SYMBOLS.get(currency_code, '$')
+            st.write(f"💱 **{currency_symbol} {currency_code}**")
+            st.markdown("---")
+
+        # 3. Navigation
+        st.markdown("### 🧭 Menu")
+        menu = st.radio(
+            "Go to:", 
+            ["Dashboard", "Add Expense", "Edit Expenses", "Settle Expenses", "Analytics & Export", "Manage Event"],
+            label_visibility="collapsed"
+        )
         
-        # Display Access Code
-        code = current_event.get('access_code', 'N/A')
-        st.info(f"🔑 Code: **{code}**")
+        st.divider()
         
-        # Display Currency
-        currency_code = current_event.get('currency', 'USD')
-        currency_symbol = CURRENCY_SYMBOLS.get(currency_code, '$')
-        st.caption(f"💱 Currency: {currency_symbol} {currency_code}")
-        
-        # Refresh Button
-        col_ref1, col_ref2 = st.columns([0.8, 0.2])
+        # 4. Footer Actions
+        if st.button("⬅️ Back to Events", use_container_width=True):
+            st.session_state.current_event = None
+            st.rerun()
+            
+        # Refresh Section
+        col_ref1, col_ref2 = st.columns([0.7, 0.3])
         with col_ref1:
-            st.caption(f"Last updated: {datetime.now().strftime('%H:%M')}")
+            st.caption(f"Updated: {datetime.now().strftime('%H:%M')}")
         with col_ref2:
             if st.button("🔄", key="refresh_dash", help="Refresh Data"):
                 load_data.clear()
                 st.rerun()
-        
-        if st.button("⬅️ Back to Events"):
-            st.session_state.current_event = None
-            st.rerun()
-            
-        st.divider()
-        menu = st.radio("Navigation", ["Dashboard", "Add Expense", "Edit Expenses", "Settle Expenses", "Analytics & Export", "Manage Event"])
 
     # Data Prep
     df = pd.DataFrame(current_event['expenses'])
