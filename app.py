@@ -1920,7 +1920,9 @@ Thanks!
                 # Ensure date is datetime
                 df['date_dt'] = pd.to_datetime(df['date'])
                 df_daily = df.groupby(['date_dt', 'category'])['amount'].sum().reset_index()
-                fig_time = px.bar(df_daily, x='date_dt', y='amount', color='category', title='Daily Spending by Category')
+                fig_time = px.line(df_daily, x='date_dt', y='amount', color='category', 
+                                   title='Daily Spending Trend by Category',
+                                   markers=True)
                 st.plotly_chart(fig_time, use_container_width=True)
                 
         with tab_export:
