@@ -1023,6 +1023,46 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
         all_categories.extend([f"  → {sub}" for sub in subcats])
     all_categories.extend(custom_categories)
     
+    # Smart Categorization Function
+    def predict_category(description):
+        """Predict category based on expense description using keyword matching."""
+        if not description:
+            return all_categories[0] if all_categories else "💰 Other"
+        
+        desc_lower = description.lower()
+        
+        # Keyword mappings (main category → keywords)
+        keyword_map = {
+            "🍔 Food & Dining": ["restaurant", "food", "lunch", "dinner", "breakfast", "cafe", "coffee", "pizza", "burger", "sushi", "meal", "eat", "grocery", "groceries", "supermarket", "market", "delivery", "uber eats", "doordash", "grubhub"],
+            "🚗 Transportation": ["uber", "lyft", "taxi", "gas", "fuel", "petrol", "parking", "metro", "subway", "bus", "train", "flight", "airline", "car", "vehicle", "transport"],
+            "🏠 Housing": ["rent", "utilities", "electric", "water", "internet", "wifi", "furniture", "ikea", "home depot", "cleaning", "maintenance"],
+            "🎬 Entertainment": ["movie", "cinema", "concert", "show", "netflix", "spotify", "game", "gaming", "steam", "playstation", "xbox", "hobby", "fun"],
+            "🛍️ Shopping": ["amazon", "shop", "store", "clothes", "clothing", "shoes", "mall", "target", "walmart", "electronics", "book", "gift"],
+            "💊 Health": ["doctor", "hospital", "pharmacy", "medicine", "medical", "gym", "fitness", "health", "dental", "dentist", "insurance"],
+            "✈️ Travel": ["hotel", "airbnb", "flight", "airport", "vacation", "trip", "travel", "tour", "ticket", "visa", "souvenir"],
+            "📚 Education": ["tuition", "school", "university", "course", "class", "book", "textbook", "udemy", "coursera", "education"],
+            "💼 Work": ["office", "supplies", "laptop", "computer", "software", "subscription", "work", "business"],
+            "🎉 Events": ["party", "birthday", "wedding", "celebration", "event", "gift", "present"],
+            "🐾 Pets": ["pet", "dog", "cat", "vet", "veterinary", "pet food", "grooming"],
+        }
+        
+        # Check for keyword matches
+        best_match = None
+        max_matches = 0
+        
+        for category, keywords in keyword_map.items():
+            matches = sum(1 for keyword in keywords if keyword in desc_lower)
+            if matches > max_matches:
+                max_matches = matches
+                best_match = category
+        
+        # Return best match or default
+        if best_match and best_match in all_categories:
+            return best_match
+        
+        # Default to first category
+        return all_categories[0] if all_categories else "💰 Other"
+    
     # Helper function to check if current user is admin
     def is_admin():
         roles = current_event.get('roles', {})
@@ -1272,8 +1312,25 @@ elif st.session_state.get('current_user') and st.session_state.current_event:
             
             payer = st.selectbox("Paid By", current_event['members'], index=current_event['members'].index(st.session_state.current_user) if st.session_state.current_user in current_event['members'] else 0)
             
-            # Category selection
-            category = st.selectbox("Category", all_categories, help="Select a category or enter a custom one below")
+            # Smart Category Prediction
+            predicted_category = predict_category(title) if title else all_categories[0]
+            
+            # Show prediction hint
+            if title:
+                st.info(f"💡 Smart suggestion: **{predicted_category}**")
+            
+            # Category selection with smart default
+            try:
+                default_index = all_categories.index(predicted_category)
+            except ValueError:
+                default_index = 0
+            
+            category = st.selectbox(
+                "Category", 
+                all_categories, 
+                index=default_index,
+                help="Auto-suggested based on description. Change if needed."
+            )
             
             # Optional custom category override
             custom_category = st.text_input("Or enter custom category (optional)", placeholder="e.g., Pet Supplies", help="Leave blank to use selected category above")
