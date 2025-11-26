@@ -537,6 +537,13 @@ if st.session_state.get('current_user') and st.session_state.get('pending_invite
 # --- Event Selection Screen ---
 # Only show if user is logged in AND no event is selected
 if st.session_state.get('current_user') and not st.session_state.current_event:
+    # Get user data for avatar
+    current_user_data = next((u for u in data['users'] if u['username'] == st.session_state.current_user), None)
+    
+    # Initialize settings state
+    if 'show_settings' not in st.session_state:
+        st.session_state.show_settings = False
+    
     # --- Sidebar Design ---
     with st.sidebar:
         # 1. Profile Section
