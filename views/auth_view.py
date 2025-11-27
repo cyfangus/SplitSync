@@ -43,13 +43,15 @@ def render_auth(data):
                                 time.sleep(0.5)  # Brief pause to show success message
                                 st.rerun()
                             else:
-                                st.error("Invalid username or password.")
+                                st.error("❌ Incorrect password. Please try again.")
+                                st.caption("💡 Forgot your password? Use the 'Forgot Password' tab.")
                         else:
-                            st.error("Invalid username or password.")
+                            st.error("❌ Username not found. Please check your spelling or register a new account.")
                     except Exception as e:
-                        st.error(f"Login error: {e}")
+                        st.error("❌ Unable to log in right now. Please try again in a moment.")
+                        st.caption(f"💡 If this persists, contact support. Error: {str(e)[:50]}")
                 else:
-                    st.error("Database connection error.")
+                    st.error("❌ Cannot connect to the server. Please check your internet connection.")
 
     with tab2:
         st.markdown("Create a new account.")
@@ -96,9 +98,10 @@ def render_auth(data):
                                     time.sleep(0.5)
                                     st.rerun()
                                 else:
-                                    st.error("Failed to send email. Check configuration.")
+                                    st.error("❌ Unable to send verification email.")
+                                    st.caption("💡 Please check that your email address is correct and try again.")
                     else:
-                        st.error("Please fill all fields.")
+                        st.error("❌ Please fill in all required fields to continue.")
         
         elif st.session_state.reg_step == 2:
             st.info(f"Verification code sent to {st.session_state.reg_data.get('email')}")
@@ -115,9 +118,10 @@ def render_auth(data):
                             time.sleep(1)
                             st.rerun()
                         else:
-                            st.error("❌ Registration failed. Please try again.")
+                            st.error("❌ Registration failed. Please try again or contact support.")
                 else:
-                    st.error("Invalid code.")
+                    st.error("❌ Incorrect verification code. Please check and try again.")
+                    st.caption("💡 The code was sent to your email. Check your spam folder if you don't see it.")
             if st.button("Back"):
                 st.session_state.reg_step = 1
                 st.rerun()
@@ -154,9 +158,11 @@ If you didn't request this, please ignore this email.
                         st.success(f"✅ Reset code sent! Your username is: **{username_for_email}**")
                         st.rerun()
                     else:
-                        st.error("Failed to send email.")
+                        st.error("❌ Unable to send reset email.")
+                        st.caption("💡 Please check your email configuration or try again later.")
                 else:
-                    st.error("Email not found.")
+                    st.error("❌ No account found with this email address.")
+                    st.caption("💡 Please check your spelling or register a new account.")
         
         elif st.session_state.reset_step == 2:
             st.info(f"Reset code sent to {st.session_state.reset_email}")
@@ -187,9 +193,11 @@ If you didn't request this, please ignore this email.
                                     st.session_state.reset_email = None
                                     st.rerun()
                             except Exception as e:
-                                st.error(f"Error resetting password: {e}")
+                                st.error("❌ Unable to reset password right now.")
+                                st.caption(f"💡 Please try again. Error: {str(e)[:50]}")
                 else:
-                    st.error("Invalid code.")
+                    st.error("❌ Incorrect reset code. Please check and try again.")
+                    st.caption("💡 The code was sent to your email. Make sure you entered it correctly.")
             if st.button("Cancel"):
                 st.session_state.reset_step = 1
                 st.rerun()
