@@ -135,7 +135,7 @@ elif st.session_state.current_user and st.session_state.current_event:
         
         menu = st.radio(
             "Menu",
-            ["📊 Dashboard", "➕ Add Expense", "📝 Edit Expenses", "💸 Settle Up", "📈 Analytics & Export", "🤖 AI Insights", "⚙️ Manage Event"]
+            ["📊 Dashboard", "➕ Add Expense", "📝 Edit Expenses", "💸 Settle Up", "📈 Analytics & Export", "🧠 AI Insights", "⚙️ Manage Event"]
         )
         
         st.divider()
@@ -157,7 +157,7 @@ elif st.session_state.current_user and st.session_state.current_event:
     elif menu == "📈 Analytics & Export":
         render_analytics(current_event)
         
-    elif menu == "🤖 AI Insights":
+    elif menu == "🧠 AI Insights":
         render_chatbot(current_event)
         
     elif menu == "⚙️ Manage Event":
