@@ -65,7 +65,7 @@ def render_event_dashboard(current_event, data):
                 
                 st.markdown(f"""
                 <div style="
-                    background-color: #fff3cd; 
+                    background-color: #a6232f; 
                     padding: 0.8rem; 
                     border-radius: 8px; 
                     margin-bottom: 0.5rem; 
