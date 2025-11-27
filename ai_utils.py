@@ -13,7 +13,7 @@ def get_gemini_response(query, context_data, api_key):
         genai.configure(api_key=api_key)
         
         # Use a lightweight model for speed
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         
         # Prepare the context
         # We'll summarize the data to avoid hitting token limits if the event is huge
