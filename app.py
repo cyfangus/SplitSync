@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # --- Custom CSS ---
-st.markdown(\"\"\"
+st.markdown("""
     <style>
     .main {
         padding-top: 2rem;
@@ -42,7 +42,7 @@ st.markdown(\"\"\"
         }
     }
     </style>
-    \"\"\", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 # --- Auto-refresh ---
 # Auto-refresh every 30 seconds to keep data in sync
