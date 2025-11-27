@@ -121,7 +121,7 @@ def render_settle_expenses(current_event, data):
                     
                     # Default message (different for admin vs regular user)
                     if user_is_admin:
-                        default_message = f\"\"\"Hi {debtor_name},
+                        default_message = f"""Hi {debtor_name},
 
 This is a reminder about the outstanding balance in the "{current_event['name']}" event.
 
@@ -130,9 +130,9 @@ You owe {creditor_name}: {format_currency(selected_debt['amount'], current_event
 Please settle this at your earliest convenience. You can record the payment in the app once done.
 
 Best regards,
-{st.session_state.current_user} (Event Admin)\"\"\"
+{st.session_state.current_user} (Event Admin)"""
                     else:
-                        default_message = f\"\"\"Hi {debtor_name},
+                        default_message = f"""Hi {debtor_name},
 
 This is a friendly reminder about the outstanding balance in our "{current_event['name']}" event.
 
@@ -141,7 +141,7 @@ Amount owed: {format_currency(selected_debt['amount'], current_event.get('curren
 Please settle this at your earliest convenience. You can record the payment in the app once done.
 
 Thanks!
-{st.session_state.current_user}\"\"\"
+{st.session_state.current_user}"""
                     
                     # Custom message input
                     custom_message = st.text_area(
