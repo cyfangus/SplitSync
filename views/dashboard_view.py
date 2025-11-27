@@ -8,6 +8,24 @@ from database import create_event, get_event_by_access_code, add_event_member, l
 
 def render_landing_page(data):
     """Render the main landing page."""
+    from onboarding import should_show_onboarding, show_welcome_screen, show_tutorial_step, check_if_new_user
+    
+    # Check if this is a new user
+    is_new_user = check_if_new_user(data)
+    
+    # Show onboarding for new users
+    if is_new_user and should_show_onboarding():
+        # Check if tutorial is active
+        if st.session_state.get('show_tutorial', False):
+            tutorial_step = st.session_state.get('tutorial_step', 0)
+            show_tutorial_step(tutorial_step)
+            return
+        else:
+            # Show welcome screen
+            show_welcome_screen()
+            return
+    
+    # Regular landing page for existing users
     st.title("Welcome to SplitSync! 👋")
     
     st.markdown("""
@@ -64,6 +82,17 @@ def render_landing_page(data):
 
 def render_events_list(data):
     """Render the list of events and create/join forms."""
+    from onboarding import create_demo_event
+    
+    # Load demo event if requested
+    if st.session_state.get('demo_loaded', False) and not any(e.get('id') == 'demo_event_001' for e in data.get('events', [])):
+        demo_event = create_demo_event()
+        # Add demo event to data (in-memory only for demo purposes)
+        if 'events' not in data:
+            data['events'] = []
+        data['events'].insert(0, demo_event)
+        st.session_state.data = data
+    
     col1, col2 = st.columns([1, 5])
     with col1:
         if st.button("← Home"):
