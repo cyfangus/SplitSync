@@ -22,23 +22,72 @@ st.set_page_config(
 # --- Custom CSS ---
 st.markdown("""
     <style>
+    /* Global Styles */
     .main {
-        padding-top: 2rem;
+        padding-top: 1rem;
     }
+    
+    /* Button Styling */
     .stButton>button {
         width: 100%;
-        border-radius: 8px;
-        height: 3em;
+        border-radius: 12px;
+        height: 3.5em; /* Larger touch target */
+        font-weight: 600;
+        transition: all 0.2s ease;
     }
+    .stButton>button:active {
+        transform: scale(0.98);
+    }
+    
+    /* Metric Cards */
     .stMetric {
-        background-color: #f0f2f6;
+        background-color: #f8f9fa;
         padding: 1rem;
+        border-radius: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: 1px solid #e9ecef;
+    }
+    
+    /* Input Fields */
+    .stTextInput>div>div>input {
+        border-radius: 10px;
+        padding: 0.5rem 1rem;
+    }
+    .stSelectbox>div>div>div {
         border-radius: 10px;
     }
+    
+    /* Mobile Optimizations */
+    @media (max-width: 768px) {
+        .main {
+            padding-top: 0.5rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+        
+        /* Stack columns on mobile */
+        [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 auto !important;
+            min-width: 100% !important;
+        }
+        
+        /* Larger text for inputs to prevent zoom */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+        
+        /* Hide sidebar toggle on very small screens if needed (optional) */
+    }
+    
     /* Dark mode adjustments */
     @media (prefers-color-scheme: dark) {
         .stMetric {
             background-color: #262730;
+            border-color: #3d3f4b;
+        }
+        .stButton>button {
+            border: 1px solid #4a4c5a;
         }
     }
     </style>
