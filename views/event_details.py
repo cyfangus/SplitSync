@@ -7,6 +7,21 @@ def render_event_dashboard(current_event, data):
     """Render the main dashboard for an event."""
     st.title(current_event['name'])
     
+    # Show demo banner if this is the demo event
+    if current_event.get('id') == 'demo_event_001':
+        st.info("""
+        🎯 **Demo Mode**: This is a sample event with demo data. Feel free to explore all features!
+        
+        You can:
+        - Add/edit/delete expenses
+        - Record payments
+        - View analytics
+        - Try the AI chatbot
+        
+        💡 When you're ready, create your own event from the dashboard!
+        """)
+        st.divider()
+    
     # Data Prep
     df = pd.DataFrame(current_event['expenses'])
     if not df.empty:
