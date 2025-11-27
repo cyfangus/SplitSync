@@ -12,12 +12,8 @@ def get_gemini_response(query, context_data, api_key):
     try:
         genai.configure(api_key=api_key)
         
-        # Use a lightweight model for speed
-        model = genai.GenerativeModel('gemini-2.0-flash-lite')
-        
-        # Prepare the context
-        # We'll summarize the data to avoid hitting token limits if the event is huge
-        # But for most personal events, passing the full JSON is fine.
+        # Use the latest flash model
+        model = genai.GenerativeModel('gemini-2.5-flash-latest')
         
         # Clean up data to remove unnecessary fields for the AI
         clean_expenses = []
@@ -59,8 +55,21 @@ def get_gemini_response(query, context_data, api_key):
         5. You can calculate totals, averages, and identify trends.
         """
         
+        # Generate response with timeout handling
         response = model.generate_content(prompt)
-        return response.text
+        
+        # Check if response has text
+        if hasattr(response, 'text') and response.text:
+            return response.text
+        else:
+            return "⚠️ The AI did not return a response. Please try again."
         
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+        error_msg = str(e)
+        # Provide more helpful error messages
+        if "404" in error_msg:
+            return f"❌ Model Error: The AI model is not available. Error: {error_msg}\n\nTry updating the google-generativeai package: `pip install --upgrade google-generativeai`"
+        elif "API key" in error_msg:
+            return "❌ Invalid API Key. Please check your Gemini API key."
+        else:
+            return f"❌ Error: {error_msg}"
