@@ -23,7 +23,17 @@ def render_event_dashboard(current_event, data):
         unsettled_df = df
 
     if df.empty:
-        st.info("No expenses recorded yet.")
+        # Empty state with helpful guidance
+        st.info("📝 **No expenses yet!** Get started by adding your first expense.")
+        st.markdown("""
+        ### Quick Start Guide:
+        1. Click **"➕ Add Expense"** in the sidebar
+        2. Enter the expense details (description, amount, who paid)
+        3. Select who should split the cost
+        4. Save and you're done!
+        
+        💡 **Tip:** You can add expenses in different currencies and we'll convert them automatically!
+        """)
     else:
         debts = calculate_debts(current_event['expenses'], current_event['members'])
         

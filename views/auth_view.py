@@ -31,7 +31,7 @@ def render_auth(data):
                         if response.data and len(response.data) > 0:
                             user = response.data[0]
                             if verify_password(password_input, user['password']):
-                                st.success("✅ Login successful!")
+                                st.toast("✅ Login successful!", icon="✅")
                                 st.session_state.current_user = user['username']
                                 # Set query param for persistent login
                                 st.query_params['user'] = user['username']
@@ -59,10 +59,39 @@ def render_auth(data):
             with st.form("reg_form_1"):
                 new_username = st.text_input("Choose Username")
                 st.caption("📝 Min 3 chars. Letters, numbers, and underscores only. No spaces.")
+                
+                # Real-time username validation
+                if new_username:
+                    from validation import validate_username
+                    existing_usernames = [u['username'] for u in data['users']]
+                    is_valid, msg, available = validate_username(new_username, existing_usernames)
+                    if available is False:
+                        st.error(msg)
+                    elif available is True:
+                        st.success(msg)
+                    elif not is_valid:
+                        st.warning(msg)
+                
                 new_display_name = st.text_input("Display Name (Optional)", placeholder="e.g. John Doe")
                 new_email = st.text_input("Email Address")
+                
+                # Real-time email validation
+                if new_email:
+                    from validation import validate_email
+                    is_valid_email, email_msg = validate_email(new_email)
+                    if is_valid_email:
+                        st.success(email_msg)
+                    else:
+                        st.warning(email_msg)
+                
                 new_password = st.text_input("Choose Password", type="password")
                 st.caption("🔒 Min 8 chars. Must include uppercase, lowercase, number, and special char.")
+                
+                # Real-time password strength indicator
+                if new_password:
+                    from validation import show_password_strength_meter
+                    show_password_strength_meter(new_password)
+                
                 confirm_password = st.text_input("Confirm Password", type="password")
                 
                 if st.form_submit_button("Next: Verify Email"):
@@ -86,7 +115,7 @@ def render_auth(data):
                             with st.spinner("📧 Sending verification code..."):
                                 code = ''.join(random.choices(string.digits, k=6))
                                 if send_email(new_email, "SplitSync Verification Code", f"Your code is: {code}"):
-                                    st.success("✅ Verification code sent!")
+                                    st.toast("✅ Verification code sent!", icon="📧")
                                     st.session_state.reg_code = code
                                     st.session_state.reg_data = {
                                         "username": new_username,
@@ -110,7 +139,7 @@ def render_auth(data):
                 if code_input == st.session_state.reg_code:
                     with st.spinner("✨ Creating your account..."):
                         if register_user(st.session_state.reg_data):
-                            st.success(f"✅ User {st.session_state.reg_data['username']} registered! Please login.")
+                            st.toast(f"✅ Account created! Welcome {st.session_state.reg_data['username']}!", icon="🎉")
                             # Reset state
                             st.session_state.reg_step = 1
                             st.session_state.reg_code = None
@@ -155,7 +184,7 @@ If you didn't request this, please ignore this email.
                         st.session_state.reset_code = code
                         st.session_state.reset_email = reset_email
                         st.session_state.reset_step = 2
-                        st.success(f"✅ Reset code sent! Your username is: **{username_for_email}**")
+                        st.toast(f"✅ Reset code sent! Username: {username_for_email}", icon="📧")
                         st.rerun()
                     else:
                         st.error("❌ Unable to send reset email.")
@@ -187,7 +216,7 @@ If you didn't request this, please ignore this email.
                                     username = response.data[0]['username']
                                     new_hash = hash_password(new_pass)
                                     supabase.table('users').update({'password': new_hash}).eq('username', username).execute()
-                                    st.success("✅ Password reset successful! Please login.")
+                                    st.toast("✅ Password reset successful! Please login.", icon="🔐")
                                     st.session_state.reset_step = 1
                                     st.session_state.reset_code = None
                                     st.session_state.reset_email = None

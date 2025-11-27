@@ -34,6 +34,12 @@ def render_settle_expenses(current_event, data):
     
     if not debts:
         st.success("✅ All settled up! No outstanding payments.")
+        st.markdown("""
+        ### 🎉 Great job!
+        Everyone in this event is square. When new expenses are added, any outstanding balances will appear here.
+        
+        💡 **Tip:** You can view payment history at the bottom of this page.
+        """)
     else:
         st.info("The following payments are pending:")
         for debt in debts:

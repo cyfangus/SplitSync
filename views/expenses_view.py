@@ -13,7 +13,7 @@ def render_add_expense(current_event):
     
     # Show success message if expense was just saved
     if st.session_state.expense_saved:
-        st.success("✅ Expense saved successfully!")
+        st.toast("✅ Expense saved successfully!", icon="💰")
         st.session_state.expense_saved = False
     
     # 1. Currency Selection (Outside Form for interactivity)
@@ -256,7 +256,7 @@ def render_edit_expenses(current_event):
         
         # Show success message if expense was just updated
         if st.session_state.expense_updated:
-            st.success("✅ Expense updated successfully!")
+            st.toast("✅ Expense updated successfully!", icon="✏️")
             st.session_state.expense_updated = False
         
         # Display list of expenses to select from
@@ -491,7 +491,7 @@ def render_edit_expenses(current_event):
                     if st.button("✅ Yes, Delete", type="primary", key="confirm_delete_yes"):
                         with st.spinner("🗑️ Deleting expense..."):
                             if delete_expense(selected_expense['id']):
-                                st.success("Expense deleted successfully!")
+                                st.toast("✅ Expense deleted successfully!", icon="🗑️")
                                 st.session_state.confirm_delete_expense = None
                                 st.rerun()
                             else:

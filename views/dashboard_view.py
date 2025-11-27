@@ -89,7 +89,16 @@ def render_events_list(data):
                         st.rerun()
                 st.divider()
     else:
-        st.info("You are not part of any events yet.")
+        st.info("📭 **No events found.** Create your first event to get started!")
+        st.markdown("""
+        ### How to create an event:
+        1. Fill in the event name (e.g., "Japan Trip 2024")
+        2. Choose your currency
+        3. Click "Create Event"
+        4. Share the access code with friends to invite them!
+        
+        💡 **Tip:** Use the "Smart Import" feature to auto-fill details from WhatsApp!
+        """)
         
     st.divider()
 
@@ -190,7 +199,7 @@ def render_events_list(data):
                         }
                         
                         if create_event(new_event):
-                            st.success(f"✅ Event '{event_name}' created! Access code: **{access_code}**")
+                            st.toast(f"✅ Event '{event_name}' created! Code: {access_code}", icon="🎉")
                             st.info("Refresh the page to see your new event.")
                         else:
                             st.error("❌ Failed to create event. Please check the error message above.")
@@ -221,7 +230,7 @@ def render_events_list(data):
                             if st.session_state.current_user not in event_to_join['members']:
                                 # Add user to event
                                 if add_event_member(event_to_join['id'], st.session_state.current_user, 'member'):
-                                    st.success(f"✅ Joined event: {event_to_join['name']}")
+                                    st.toast(f"✅ Joined event: {event_to_join['name']}", icon="🤝")
                                     time.sleep(1)
                                     st.rerun()
                                 else:
