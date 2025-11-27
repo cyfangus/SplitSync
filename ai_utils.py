@@ -13,7 +13,7 @@ def get_gemini_response(query, context_data, api_key):
         genai.configure(api_key=api_key)
         
         # Use the latest flash model
-        model = genai.GenerativeModel('gemini-2.5-flash-latest')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         # Clean up data to remove unnecessary fields for the AI
         clean_expenses = []
