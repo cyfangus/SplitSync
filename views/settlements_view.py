@@ -42,8 +42,30 @@ def render_settle_expenses(current_event, data):
         """)
     else:
         st.info("The following payments are pending:")
+        
         for debt in debts:
-            st.write(f"• **{debt['debtor']}** owes **{debt['creditor']}**: {format_currency(debt['amount'], current_event.get('currency', 'USD'))}")
+            # Create a card-like container for each debt
+            with st.container():
+                st.markdown(f"""
+                <div style="
+                    background-color: #f8f9fa; 
+                    padding: 1rem; 
+                    border-radius: 10px; 
+                    margin-bottom: 0.5rem; 
+                    border-left: 5px solid #ff4b4b;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: bold; font-size: 1.1em;">{debt['debtor']}</div>
+                            <div style="color: #666; font-size: 0.9em;">owes {debt['creditor']}</div>
+                        </div>
+                        <div style="font-weight: bold; font-size: 1.2em; color: #ff4b4b;">
+                            {format_currency(debt['amount'], current_event.get('currency', 'USD'))}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
     
     
     st.divider()

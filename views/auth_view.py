@@ -56,81 +56,106 @@ def render_auth(data):
     with tab2:
         st.markdown("Create a new account.")
         if st.session_state.reg_step == 1:
-            with st.form("reg_form_1"):
-                new_username = st.text_input("Choose Username")
-                st.caption("📝 Min 3 chars. Letters, numbers, and underscores only. No spaces.")
+            # Move inputs OUTSIDE form for real-time validation
+            st.subheader("📝 Registration Details")
+            
+            # Username with instant validation
+            new_username = st.text_input("Choose Username", key="reg_username")
+            st.caption("📝 Min 3 chars. Letters, numbers, and underscores only. No spaces.")
+            
+            username_valid = False
+            if new_username:
+                from validation import validate_username
+                existing_usernames = [u['username'] for u in data['users']]
+                is_valid, msg, available = validate_username(new_username, existing_usernames)
+                if available is False:
+                    st.error(msg)
+                elif available is True:
+                    st.success(msg)
+                    username_valid = True
+                elif not is_valid:
+                    st.warning(msg)
+            
+            # Display name
+            new_display_name = st.text_input("Display Name (Optional)", placeholder="e.g. John Doe", key="reg_display")
+            
+            # Email with instant validation
+            new_email = st.text_input("Email Address", key="reg_email")
+            
+            email_valid = False
+            if new_email:
+                from validation import validate_email
+                # Check if email already exists
+                email_exists = any(u.get('email') == new_email for u in data['users'])
                 
-                # Real-time username validation
-                if new_username:
-                    from validation import validate_username
-                    existing_usernames = [u['username'] for u in data['users']]
-                    is_valid, msg, available = validate_username(new_username, existing_usernames)
-                    if available is False:
-                        st.error(msg)
-                    elif available is True:
-                        st.success(msg)
-                    elif not is_valid:
-                        st.warning(msg)
-                
-                new_display_name = st.text_input("Display Name (Optional)", placeholder="e.g. John Doe")
-                new_email = st.text_input("Email Address")
-                
-                # Real-time email validation
-                if new_email:
-                    from validation import validate_email
+                if email_exists:
+                    st.error("❌ This email is already registered")
+                else:
                     is_valid_email, email_msg = validate_email(new_email)
                     if is_valid_email:
                         st.success(email_msg)
+                        email_valid = True
                     else:
                         st.warning(email_msg)
-                
-                new_password = st.text_input("Choose Password", type="password")
-                st.caption("🔒 Min 8 chars. Must include uppercase, lowercase, number, and special char.")
-                
-                # Real-time password strength indicator
-                if new_password:
-                    from validation import show_password_strength_meter
-                    show_password_strength_meter(new_password)
-                
-                confirm_password = st.text_input("Confirm Password", type="password")
-                
-                if st.form_submit_button("Next: Verify Email"):
-                    if new_username and new_email and new_password:
-                        is_valid_pass, pass_err = validate_password(new_password)
-                        
-                        if new_password != confirm_password:
-                            st.error("Passwords do not match.")
-                        elif not is_valid_pass:
-                            st.error(pass_err)
-                        elif not re.match(r"^[a-zA-Z0-9_]+$", new_username):
-                            st.error("Username can only contain letters, numbers, and underscores (no spaces).")
-                        elif len(new_username) < 3:
-                            st.error("Username must be at least 3 characters long.")
-                        elif any(u['username'] == new_username for u in data['users']):
-                            st.warning("Username already exists.")
-                        elif any(u.get('email') == new_email for u in data['users']):
-                            st.warning("Email already registered.")
-                        else:
-                            # Generate Code
-                            with st.spinner("📧 Sending verification code..."):
-                                code = ''.join(random.choices(string.digits, k=6))
-                                if send_email(new_email, "SplitSync Verification Code", f"Your code is: {code}"):
-                                    st.toast("✅ Verification code sent!", icon="📧")
-                                    st.session_state.reg_code = code
-                                    st.session_state.reg_data = {
-                                        "username": new_username,
-                                        "email": new_email,
-                                        "password": hash_password(new_password),
-                                        "display_name": new_display_name if new_display_name else new_username
-                                    }
-                                    st.session_state.reg_step = 2
-                                    time.sleep(0.5)
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Unable to send verification email.")
-                                    st.caption("💡 Please check that your email address is correct and try again.")
+            
+            # Password with instant strength meter
+            new_password = st.text_input("Choose Password", type="password", key="reg_password")
+            st.caption("🔒 Min 8 chars. Must include uppercase, lowercase, number, and special char.")
+            
+            password_valid = False
+            if new_password:
+                from validation import show_password_strength_meter, validate_password_strength
+                is_valid_pass, msg, score = validate_password_strength(new_password)
+                show_password_strength_meter(new_password)
+                if score >= 4:
+                    password_valid = True
+            
+            # Confirm password with instant match check
+            confirm_password = st.text_input("Confirm Password", type="password", key="reg_confirm")
+            
+            passwords_match = False
+            if confirm_password:
+                if new_password == confirm_password:
+                    st.success("✅ Passwords match!")
+                    passwords_match = True
+                else:
+                    st.error("❌ Passwords don't match")
+            
+            st.divider()
+            
+            # Show submit button with validation status
+            all_valid = (
+                new_username and username_valid and
+                new_email and email_valid and
+                new_password and password_valid and
+                confirm_password and passwords_match
+            )
+            
+            if all_valid:
+                st.success("✅ All fields are valid! Ready to proceed.")
+            elif new_username or new_email or new_password or confirm_password:
+                st.info("💡 Please complete all fields with valid information")
+            
+            # Submit button
+            if st.button("Next: Verify Email", type="primary", disabled=not all_valid, use_container_width=True):
+                # Generate verification code
+                with st.spinner("📧 Sending verification code..."):
+                    code = ''.join(random.choices(string.digits, k=6))
+                    if send_email(new_email, "SplitSync Verification Code", f"Your code is: {code}"):
+                        st.toast("✅ Verification code sent!", icon="📧")
+                        st.session_state.reg_code = code
+                        st.session_state.reg_data = {
+                            "username": new_username,
+                            "email": new_email,
+                            "password": hash_password(new_password),
+                            "display_name": new_display_name if new_display_name else new_username
+                        }
+                        st.session_state.reg_step = 2
+                        time.sleep(0.5)
+                        st.rerun()
                     else:
-                        st.error("❌ Please fill in all required fields to continue.")
+                        st.error("❌ Unable to send verification email.")
+                        st.caption("💡 Please check that your email address is correct and try again.")
         
         elif st.session_state.reg_step == 2:
             st.info(f"Verification code sent to {st.session_state.reg_data.get('email')}")

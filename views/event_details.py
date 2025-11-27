@@ -62,7 +62,22 @@ def render_event_dashboard(current_event, data):
             for debt in debts:
                 debtor_name = get_display_name(debt['debtor'], data['users'])
                 creditor_name = get_display_name(debt['creditor'], data['users'])
-                st.info(f"**{debtor_name}** owes **{creditor_name}**: {format_currency(debt['amount'], current_event.get('currency', 'USD'))}")
+                
+                st.markdown(f"""
+                <div style="
+                    background-color: #fff3cd; 
+                    padding: 0.8rem; 
+                    border-radius: 8px; 
+                    margin-bottom: 0.5rem; 
+                    border-left: 4px solid #ffc107;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                ">
+                    <span><strong>{debtor_name}</strong> owes <strong>{creditor_name}</strong></span>
+                    <span style="font-weight: bold;">{format_currency(debt['amount'], current_event.get('currency', 'USD'))}</span>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.success("✅ All settled up!")
             
@@ -93,16 +108,35 @@ def render_event_dashboard(current_event, data):
         # Add formatted amount column
         display_df['display_amount'] = display_df.apply(lambda x: format_expense_display(x, current_event.get('currency', 'USD')), axis=1)
         
-        st.dataframe(
-            display_df.sort_values(by='date', ascending=False)[['date', 'title', 'display_amount', 'payer', 'involved', 'settled']],
-            column_config={
-                "display_amount": st.column_config.TextColumn("Amount"),
-                "date": "Date",
-                "title": "Description",
-                "payer": "Paid By",
-                "involved": "Split Among",
-                "settled": "Status"
-            },
-            use_container_width=True,
-            hide_index=True
-        )
+        # Mobile-friendly transaction list
+        st.markdown("### 📝 Transactions")
+        
+        sorted_df = display_df.sort_values(by='date', ascending=False)
+        
+        for _, row in sorted_df.iterrows():
+            status_color = "#28a745" if row['settled'] else "#ffc107"
+            status_text = "Settled" if row['settled'] else "Pending"
+            
+            st.markdown(f"""
+            <div style="
+                background-color: white;
+                padding: 1rem;
+                border-radius: 10px;
+                margin-bottom: 0.8rem;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                border: 1px solid #e9ecef;
+            ">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="font-weight: bold; font-size: 1.1em;">{row['title']}</span>
+                    <span style="font-weight: bold; font-size: 1.1em;">{row['display_amount']}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; color: #666;">
+                    <span>📅 {row['date']}</span>
+                    <span>👤 Paid by {row['payer']}</span>
+                </div>
+                <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #f0f0f0; font-size: 0.85em; display: flex; justify-content: space-between;">
+                    <span style="color: #888;">Split: {row['involved']}</span>
+                    <span style="color: {status_color}; font-weight: 600;">{status_text}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
