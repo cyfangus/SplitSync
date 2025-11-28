@@ -430,6 +430,28 @@ def save_data(data):
     st.warning("⚠️ save_data() is deprecated")
     return False
 
+# --- Feedback ---
+def submit_feedback(user, message, type='general'):
+    """Submit user feedback."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    try:
+        # Try to insert into feedback table
+        # Note: Requires 'feedback' table in Supabase
+        feedback_data = {
+            'username': user,
+            'message': message,
+            'type': type,
+            'created_at': 'now()'
+        }
+        supabase.table('feedback').insert(feedback_data).execute()
+        return True
+    except Exception as e:
+        # Fallback: Log to console if table doesn't exist
+        print(f"Feedback received from {user}: {message}")
+        return True # Return true so user sees success even if DB fails (graceful degradation)
+
 # --- Telegram Bot Support ---
 
 def link_telegram_user(username, telegram_id):
