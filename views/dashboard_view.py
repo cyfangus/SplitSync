@@ -82,17 +82,6 @@ def render_landing_page(data):
 
 def render_events_list(data):
     """Render the list of events and create/join forms."""
-    from onboarding import create_demo_event
-    
-    # Load demo event if requested
-    if st.session_state.get('demo_loaded', False) and not any(e.get('id') == 'demo_event_001' for e in data.get('events', [])):
-        demo_event = create_demo_event()
-        # Add demo event to data (in-memory only for demo purposes)
-        if 'events' not in data:
-            data['events'] = []
-        data['events'].insert(0, demo_event)
-        st.session_state.data = data
-    
     col1, col2 = st.columns([1, 5])
     with col1:
         if st.button("← Home"):

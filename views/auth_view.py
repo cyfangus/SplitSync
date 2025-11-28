@@ -165,10 +165,21 @@ def render_auth(data):
                     with st.spinner("✨ Creating your account..."):
                         if register_user(st.session_state.reg_data):
                             st.toast(f"✅ Account created! Welcome {st.session_state.reg_data['username']}!", icon="🎉")
-                            # Reset state
+                            
+                            # Auto-login
+                            st.session_state.current_user = st.session_state.reg_data['username']
+                            st.query_params['user'] = st.session_state.reg_data['username']
+                            
+                            # Reset registration state
                             st.session_state.reg_step = 1
                             st.session_state.reg_code = None
                             st.session_state.reg_data = {}
+                            
+                            # Reload data for new user
+                            load_data.clear()
+                            st.session_state.data = load_data(current_user=st.session_state.current_user)
+                            st.session_state.show_events = False
+                            
                             time.sleep(1)
                             st.rerun()
                         else:

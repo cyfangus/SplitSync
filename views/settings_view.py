@@ -109,6 +109,19 @@ def render_settings(data):
                     st.error("Display name cannot be empty.")
         
         st.divider()
+        
+        st.subheader("🎓 Tutorial")
+        if st.button("Restart Onboarding Tutorial"):
+            st.session_state.onboarding_complete = False
+            st.session_state.show_tutorial = True
+            st.session_state.tutorial_step = 0
+            st.session_state.show_settings = False
+            st.session_state.show_events = False
+            st.toast("Tutorial restarted! Redirecting...", icon="🎓")
+            time.sleep(1)
+            st.rerun()
+        
+        st.divider()
 
         st.subheader("Change Username")
         st.warning("⚠️ Changing your username will update it across all past events and expenses.")
