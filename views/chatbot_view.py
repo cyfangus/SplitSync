@@ -1,10 +1,19 @@
 import streamlit as st
 from ai_utils import get_gemini_response
+from database import get_user_by_username
+from subscription import can_use_ai, show_upgrade_prompt
 
 def render_chatbot(current_event):
     """Render the AI Chatbot interface."""
     st.title("🤖 Spending Insights Chatbot")
     st.caption("Ask questions about your event's expenses and get instant answers powered by Gemini.")
+    
+    # Check if user has access to AI
+    user_data = get_user_by_username(st.session_state.current_user)
+    if not can_use_ai(user_data):
+        show_upgrade_prompt("AI Insights", location="banner")
+        st.stop()
+    
     
     # API Key Management
     api_key = None

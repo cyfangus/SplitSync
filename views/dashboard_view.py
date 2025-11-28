@@ -4,7 +4,8 @@ import string
 import time
 from datetime import datetime
 from utils import get_display_name, parse_group_info
-from database import create_event, get_event_by_access_code, add_event_member, load_data
+from database import create_event, get_event_by_access_code, add_event_member, load_data, get_user_by_username
+from subscription import can_create_event, show_limit_reached, is_pro, get_pro_badge
 
 def render_landing_page(data):
     """Render the main landing page."""
@@ -198,29 +199,38 @@ def render_events_list(data):
             
             if submitted:
                 if event_name:
-                    with st.spinner("🎉 Creating your event..."):
-                        # Generate unique event ID using timestamp
-                        event_id = f"event_{int(time.time() * 1000)}"
-                        
-                        # Generate unique access code
-                        access_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-                        
-                        new_event = {
-                            "id": event_id,
-                            "name": event_name,
-                            "members": members,
-                            "roles": {st.session_state.current_user: "admin"},  # Creator is admin
-                            "currency": selected_currency,
-                            "expenses": [],
-                            "access_code": access_code,
-                            "settlements": []
-                        }
-                        
-                        if create_event(new_event):
-                            st.toast(f"✅ Event '{event_name}' created! Code: {access_code}", icon="🎉")
-                            st.info("Refresh the page to see your new event.")
-                        else:
-                            st.error("❌ Failed to create event. Please check the error message above.")
+                    # Check subscription limits
+                    user_data = get_user_by_username(st.session_state.current_user)
+                    current_events_count = len(my_events)
+                    
+                    if not can_create_event(user_data, current_events_count):
+                        # Show limit reached message
+                        from subscription import FREE_LIMITS
+                        show_limit_reached("events", current_events_count, FREE_LIMITS['max_events'])
+                    else:
+                        with st.spinner("🎉 Creating your event..."):
+                            # Generate unique event ID using timestamp
+                            event_id = f"event_{int(time.time() * 1000)}"
+                            
+                            # Generate unique access code
+                            access_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                            
+                            new_event = {
+                                "id": event_id,
+                                "name": event_name,
+                                "members": members,
+                                "roles": {st.session_state.current_user: "admin"},  # Creator is admin
+                                "currency": selected_currency,
+                                "expenses": [],
+                                "access_code": access_code,
+                                "settlements": []
+                            }
+                            
+                            if create_event(new_event):
+                                st.toast(f"✅ Event '{event_name}' created! Code: {access_code}", icon="🎉")
+                                st.info("Refresh the page to see your new event.")
+                            else:
+                                st.error("❌ Failed to create event. Please check the error message above.")
                 else:
                     st.error("Please provide an event name.")
 

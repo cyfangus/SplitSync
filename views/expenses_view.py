@@ -1,7 +1,8 @@
 import streamlit as st
 from datetime import datetime
 from utils import predict_category, get_exchange_rate, safe_eval_formula, format_expense_display
-from database import add_expense, update_expense, delete_expense
+from database import add_expense, update_expense, delete_expense, get_user_by_username
+from subscription import can_add_expense, show_limit_reached, FREE_LIMITS
 
 def render_add_expense(current_event):
     """Render the Add Expense form."""
@@ -184,51 +185,59 @@ def render_add_expense(current_event):
         
         if submitted:
             if title and involved:
-                with st.spinner("💰 Saving expense..."):
-                    # Logic to determine final amounts
-                    final_amount = 0.0
-                    original_amt = None
-                    original_curr = None
-                    exch_rate = None
-                    
-                    if selected_currency == event_currency:
-                        final_amount = amount_in_base
-                    else:
-                        original_curr = selected_currency
-                        original_amt = amount_in_original
+                # Check subscription limits
+                user_data = get_user_by_username(st.session_state.current_user)
+                
+                if not can_add_expense(user_data, current_event):
+                    # Show limit reached message
+                    current_count = len(current_event.get('expenses', []))
+                    show_limit_reached("expenses in this event", current_count, FREE_LIMITS['max_expenses_per_event'])
+                else:
+                    with st.spinner("💰 Saving expense..."):
+                        # Logic to determine final amounts
+                        final_amount = 0.0
+                        original_amt = None
+                        original_curr = None
+                        exch_rate = None
                         
-                        if conversion_mode == "Auto (Market Rate)":
-                            rate = get_exchange_rate(selected_currency, event_currency)
-                            if rate:
-                                final_amount = amount_in_original * rate
-                                exch_rate = rate
-                            else:
-                                st.error("Could not fetch rate. Using 1:1.")
-                                final_amount = amount_in_original
-                                exch_rate = 1.0
-                        else:
+                        if selected_currency == event_currency:
                             final_amount = amount_in_base
-                            if amount_in_original > 0:
-                                exch_rate = final_amount / amount_in_original
-                    
-                    expense_data = {
-                        "title": title,
-                        "amount": final_amount,
-                        "original_amount": original_amt,
-                        "original_currency": original_curr,
-                        "exchange_rate": exch_rate,
-                        "payer": payer,
-                        "involved": involved,
-                        "date": str(date),
-                        "category": category,
-                        "settled": False
-                    }
-                    
-                    if add_expense(current_event['id'], expense_data):
-                        st.session_state.expense_saved = True
-                        st.rerun()
-                    else:
-                        st.error("Failed to save expense.")
+                        else:
+                            original_curr = selected_currency
+                            original_amt = amount_in_original
+                            
+                            if conversion_mode == "Auto (Market Rate)":
+                                rate = get_exchange_rate(selected_currency, event_currency)
+                                if rate:
+                                    final_amount = amount_in_original * rate
+                                    exch_rate = rate
+                                else:
+                                    st.error("Could not fetch rate. Using 1:1.")
+                                    final_amount = amount_in_original
+                                    exch_rate = 1.0
+                            else:
+                                final_amount = amount_in_base
+                                if amount_in_original > 0:
+                                    exch_rate = final_amount / amount_in_original
+                        
+                        expense_data = {
+                            "title": title,
+                            "amount": final_amount,
+                            "original_amount": original_amt,
+                            "original_currency": original_curr,
+                            "exchange_rate": exch_rate,
+                            "payer": payer,
+                            "involved": involved,
+                            "date": str(date),
+                            "category": category,
+                            "settled": False
+                        }
+                        
+                        if add_expense(current_event['id'], expense_data):
+                            st.session_state.expense_saved = True
+                            st.rerun()
+                        else:
+                            st.error("Failed to save expense.")
             else:
                 st.error("Please fill all required fields.")
 
