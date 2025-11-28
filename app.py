@@ -167,12 +167,21 @@ elif st.session_state.show_settings:
 elif st.session_state.current_user and not st.session_state.current_event:
     # 3. Dashboard / Event Selection
     with st.sidebar:
-        st.title(f"Hi, {st.session_state.current_user}!")
-        if st.button("⚙️ Account Settings"):
+        from utils import get_display_name
+        display_name = get_display_name(st.session_state.current_user, st.session_state.data['users'])
+        st.title(f"Hi, {display_name}!")
+        
+        if st.button("🔄 Refresh", use_container_width=True):
+            load_data.clear()
+            st.session_state.data = load_data(st.session_state.current_user)
+            st.toast("Data refreshed!", icon="✅")
+            st.rerun()
+        
+        if st.button("⚙️ Account Settings", use_container_width=True):
             st.session_state.show_settings = True
             st.rerun()
         
-        if st.button("🚪 Logout"):
+        if st.button("🚪 Logout", use_container_width=True):
             st.session_state.current_user = None
             st.session_state.current_event = None
             st.session_state.show_events = False
