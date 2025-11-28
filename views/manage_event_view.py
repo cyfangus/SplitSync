@@ -15,22 +15,37 @@ def render_manage_event(current_event, data):
     # --- Invite Members Section ---
     st.subheader("🔗 Invite Members")
     
-    # Generate Invite Link
-    # In production, this would be your actual domain
-    # For local dev, it might be localhost:8501
+    # Access Code Display
+    st.markdown("### 🔑 Access Code")
+    st.info(f"Share this code with your friends: **{current_event.get('access_code', 'N/A')}**")
+    
+    # Generate Invite Link & Message
     base_url = "https://splitsync.streamlit.app" # Replace with your actual URL
     invite_link = f"{base_url}/?invite={current_event['id']}"
+    access_code = current_event.get('access_code', 'N/A')
     
-    st.info("Share this link to let others join instantly:")
-    st.code(invite_link, language="text")
+    # Smart Invite Message
+    invite_message = f"""Hey! 👋 I'm using SplitSync to track expenses for "{current_event['name']}".
+
+🔗 Join here: {invite_link}
+🔑 Access Code: {access_code}
+
+Let's split costs easily! 💸"""
+
+    st.markdown("### 📨 Send Invite")
+    st.write("Copy this message to share:")
+    st.code(invite_message, language="text")
     
     # WhatsApp Share Button
-    # URL encode the message
-    message = f"Join our '{current_event['name']}' expense group on SplitSync: {invite_link}"
-    encoded_message = urllib.parse.quote(message)
+    encoded_message = urllib.parse.quote(invite_message)
     whatsapp_url = f"https://wa.me/?text={encoded_message}"
     
-    st.link_button("📲 Share on WhatsApp", whatsapp_url, type="primary")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.link_button("📲 Share on WhatsApp", whatsapp_url, type="primary", use_container_width=True)
+    with col2:
+        mailto_url = f"mailto:?subject=Join {urllib.parse.quote(current_event['name'])} on SplitSync&body={encoded_message}"
+        st.link_button("📧 Share via Email", mailto_url, use_container_width=True)
     
     st.divider()
     
