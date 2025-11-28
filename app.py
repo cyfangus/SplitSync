@@ -152,7 +152,11 @@ if st.session_state.current_user:
 
 # --- Main App Logic ---
 
-if not st.session_state.current_user:
+# Check if upgrade modal should be shown
+if st.session_state.get('show_upgrade_modal', False):
+    from subscription import render_upgrade_modal
+    render_upgrade_modal()
+elif not st.session_state.current_user:
     # 1. Auth Flow
     render_auth(st.session_state.data)
 
