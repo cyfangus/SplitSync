@@ -137,6 +137,17 @@ if "user" in query_params and not st.session_state.current_user:
 if st.session_state.current_user:
     # Always reload data to ensure freshness
     st.session_state.data = load_data(st.session_state.current_user)
+    
+    # Inject demo event if requested
+    if st.session_state.get('demo_loaded', False):
+        from onboarding import create_demo_event
+        demo_event = create_demo_event()
+        # Ensure 'events' list exists
+        if 'events' not in st.session_state.data:
+            st.session_state.data['events'] = []
+        # Check if already exists to avoid duplicates
+        if not any(e.get('id') == 'demo_event_001' for e in st.session_state.data['events']):
+            st.session_state.data['events'].insert(0, demo_event)
 
 # --- Main App Logic ---
 
