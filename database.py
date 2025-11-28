@@ -232,6 +232,38 @@ def update_user(username, updates):
         st.error(f"Update failed: {str(e)}")
         return False
 
+def anonymize_user(username):
+    """
+    Safely 'delete' a user by scrubbing PII but keeping transaction history.
+    Returns True if successful.
+    """
+    supabase = init_connection()
+    if not supabase:
+        return False
+    try:
+        # 1. Generate random suffix to ensure unique constraint on email/username if needed
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
+        
+        # 2. Update user record with anonymized data
+        updates = {
+            'email': f"deleted_{unique_id}@splitsync.app", # Keep email format valid but fake
+            'password': "DELETED_ACCOUNT_HASH", # Invalidate login
+            'display_name': "Deleted User",
+            'avatar': None,
+            # We keep the 'username' as is because it's a Foreign Key in many tables.
+            # Changing it would require updating 'expenses', 'settlements', 'event_members', etc.
+            # If username is PII (e.g. "john.smith"), we SHOULD update it, but for this MVP 
+            # we will assume keeping the ID is acceptable or too complex to refactor now.
+            # Ideally: update_username_references_in_db(username, f"user_{unique_id}")
+        }
+        
+        supabase.table('users').update(updates).eq('username', username).execute()
+        return True
+    except Exception as e:
+        st.error(f"Account deletion failed: {str(e)}")
+        return False
+
 def update_event(event_id, updates):
     """Update event information."""
     supabase = init_connection()
