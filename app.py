@@ -1,15 +1,44 @@
-import streamlit as st
-from streamlit_autorefresh import st_autorefresh
-from database import init_db, load_data, init_connection
-from views.auth_view import render_auth
-from views.dashboard_view import render_landing_page, render_events_list
-from views.settings_view import render_settings
-from views.event_details import render_event_dashboard
-from views.expenses_view import render_add_expense, render_edit_expenses
-from views.settlements_view import render_settle_expenses
-from views.analytics_view import render_analytics
-from views.manage_event_view import render_manage_event
-from views.chatbot_view import render_chatbot
+from ui_utils import confirm_action, render_feedback_widget
+
+# ... (rest of imports)
+
+# ... (inside Dashboard / Event Selection sidebar)
+    with st.sidebar:
+        st.title(f"Hi, {st.session_state.current_user}!")
+        if st.button("⚙️ Account Settings"):
+            st.session_state.show_settings = True
+            st.rerun()
+        
+        if st.button("🚪 Logout"):
+            st.session_state.current_user = None
+            st.session_state.current_event = None
+            st.session_state.show_events = False
+            st.query_params.clear()
+            st.rerun()
+            
+        st.divider()
+        render_feedback_widget()
+
+# ... (inside Event Dashboard sidebar)
+    with st.sidebar:
+        if st.button("← Back to Events"):
+            st.session_state.current_event = None
+            st.rerun()
+            
+        st.divider()
+        st.header(current_event['name'])
+        st.caption(f"Code: {current_event['access_code']}")
+        
+        menu = st.radio(
+            "Menu",
+            ["📊 Dashboard", "➕ Add Expense", "📝 Edit Expenses", "💸 Settle Up", "📈 Analytics & Export", "🧠 AI Insights", "⚙️ Manage Event"]
+        )
+        
+        st.divider()
+        st.caption(f"Logged in as: {st.session_state.current_user}")
+        
+        st.divider()
+        render_feedback_widget()
 
 # --- Page Config ---
 st.set_page_config(

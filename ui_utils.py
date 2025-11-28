@@ -51,6 +51,27 @@ def confirm_action(action_name, warning_message=None):
         st.session_state[key] = False
         return True
 
+def render_feedback_widget():
+    """Render a feedback widget in the sidebar."""
+    from database import submit_feedback
+    
+    with st.sidebar:
+        with st.expander("💭 Feedback & Support"):
+            st.caption("Found a bug? Have an idea? Let us know!")
+            
+            with st.form("feedback_form", clear_on_submit=True):
+                feedback_type = st.selectbox("Type", ["🐛 Bug Report", "💡 Feature Request", "❤️ General Feedback"])
+                message = st.text_area("Message")
+                
+                if st.form_submit_button("Submit Feedback"):
+                    if message:
+                        if submit_feedback(st.session_state.current_user, message, feedback_type):
+                            st.toast("Thank you for your feedback!", icon="🙏")
+                        else:
+                            st.error("Could not send feedback. Please try again.")
+                    else:
+                        st.warning("Please enter a message.")
+
 def with_loading(message="Processing..."):
     """
     Decorator for functions that need loading state
