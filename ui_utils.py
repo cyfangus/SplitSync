@@ -51,6 +51,18 @@ def confirm_action(action_name, warning_message=None):
         st.session_state[key] = False
         return True
 
+def get_avatar_url(username, style="initials"):
+    """Generate a DiceBear avatar URL."""
+    # Styles: initials, bottts, avataaars, identicon
+    return f"https://api.dicebear.com/9.x/{style}/svg?seed={username}"
+
+def render_avatar(username, size=40):
+    """Render a user avatar (circular)."""
+    url = get_avatar_url(username)
+    st.markdown(f"""
+        <img src="{url}" width="{size}" height="{size}" style="border-radius: 50%; vertical-align: middle; margin-right: 10px;">
+    """, unsafe_allow_html=True)
+
 def render_feedback_widget():
     """Render a feedback widget in the sidebar."""
     from database import submit_feedback
