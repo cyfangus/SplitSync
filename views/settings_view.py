@@ -7,47 +7,36 @@ from PIL import Image
 from utils import get_display_name
 from auth import hash_password, verify_password, validate_password
 from database import update_user, init_connection, get_user_by_username, update_username_references_in_db
+from ui_utils import render_avatar
 
 def render_settings(data):
     """Render the account settings page."""
     st.title("⚙️ Account Settings")
     
-    # Profile Picture Section
-    st.subheader("Profile Picture")
-    col_avatar, col_upload = st.columns([1, 3])
+    # Profile Header
+    col_av, col_info = st.columns([1, 4])
+    with col_av:
+        render_avatar(st.session_state.current_user, size=80)
+    with col_info:
+        st.subheader(f"{st.session_state.current_user}")
+        st.caption("Auto-generated avatar based on your username.")
     
-    current_user_data = next((u for u in data['users'] if u['username'] == st.session_state.current_user), None)
+    st.divider()
     
-    with col_avatar:
-        if current_user_data and current_user_data.get('avatar'):
-            try:
-                st.image(base64.b64decode(current_user_data['avatar']), width=100, caption="Current")
-            except:
-                st.error("Error loading avatar")
-        else:
-            st.info("No avatar set")
+    # Display Name Form
+    current_display_name = get_display_name(st.session_state.current_user, data['users'])
     
-    with col_upload:
-        uploaded_file = st.file_uploader("Upload new avatar", type=['png', 'jpg', 'jpeg'])
-        if uploaded_file is not None:
-            if st.button("Save Avatar", type="primary"):
-                try:
-                    image = Image.open(uploaded_file)
-                    # Resize to square 150x150
-                    image = image.resize((150, 150))
-                    # Convert to base64
-                    buffered = io.BytesIO()
-                    image.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    
-                    # Save
-                    if update_user(st.session_state.current_user, {'avatar': img_str}):
-                        st.success("✅ Avatar updated!")
+    with st.form("change_display_name"):
+        new_display_name = st.text_input("Display Name", value=current_display_name)
+        if st.form_submit_button("Update Display Name"):
+            if new_display_name:
+                with st.spinner("✏️ Updating display name..."):
+                    if update_user(st.session_state.current_user, {'display_name': new_display_name}):
+                        st.success("✅ Display name updated!")
+                        time.sleep(0.5)
                         st.rerun()
-                    else:
-                        st.error("Failed to update avatar.")
-                except Exception as e:
-                    st.error(f"Error processing image: {e}")
+            else:
+                st.error("Display name cannot be empty.")
     
     st.divider()
     

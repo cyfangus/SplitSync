@@ -2,6 +2,7 @@ import streamlit as st
 import base64
 import urllib.parse
 from database import remove_event_member, add_event_member, update_member_role, update_event, delete_event, load_data
+from ui_utils import render_avatar
 
 def render_manage_event(current_event, data):
     """Render the Manage Event page."""
@@ -61,13 +62,7 @@ Let's split costs easily! 💸"""
         with st.expander(f"👤 Profile: {target_user}", expanded=True):
             c1, c2 = st.columns([1, 3])
             with c1:
-                if user_data and user_data.get('avatar'):
-                    try:
-                        st.image(base64.b64decode(user_data['avatar']), width=100)
-                    except:
-                        st.write("👤")
-                else:
-                    st.write("👤 No Avatar")
+                render_avatar(target_user, size=100)
             with c2:
                 st.subheader(target_user)
                 role = current_event.get('roles', {}).get(target_user, 'member')
@@ -97,13 +92,7 @@ Let's split costs easily! 💸"""
         col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
         
         with col1:
-            if member_data and member_data.get('avatar'):
-                try:
-                    st.image(base64.b64decode(member_data['avatar']), width=35)
-                except:
-                    st.write("👤")
-            else:
-                st.write("👤")
+            render_avatar(member, size=40)
         
         with col2:
             st.write(f"**{member}**")
