@@ -161,6 +161,55 @@ def render_settings(data):
                     st.error("Please enter a valid username.")
     
     st.divider()
+    
+    # --- Danger Zone (Delete Account) ---
+    st.subheader("⚠️ Danger Zone")
+    with st.expander("Delete Account"):
+        st.warning("🚨 This action is permanent and cannot be undone.")
+        
+        # 1. Safety Check: Outstanding Debts
+        from utils import calculate_debts
+        blocking_events = []
+        
+        for event in data['events']:
+            # Calculate debts for this event
+            debts = calculate_debts(event.get('expenses', []), event.get('members', []))
+            
+            # Check if user is involved in any debt
+            user_debt = next((d for d in debts if d['debtor'] == st.session_state.current_user or d['creditor'] == st.session_state.current_user), None)
+            
+            if user_debt:
+                blocking_events.append(event['name'])
+        
+        if blocking_events:
+            st.error("❌ You cannot delete your account because you have unsettled debts/credits in the following events:")
+            for evt in blocking_events:
+                st.write(f"• {evt}")
+            st.info("💡 Please settle all balances in these events before deleting your account.")
+        else:
+            st.write("To confirm deletion, please type your username below:")
+            confirm_username = st.text_input("Username", key="del_acc_confirm")
+            
+            if st.button("🗑️ Delete My Account", type="primary", disabled=(confirm_username != st.session_state.current_user)):
+                if confirm_username == st.session_state.current_user:
+                    from database import anonymize_user
+                    
+                    with st.spinner("Deleting account..."):
+                        if anonymize_user(st.session_state.current_user):
+                            st.success("Account deleted successfully.")
+                            # Logout
+                            st.session_state.current_user = None
+                            st.session_state.current_event = None
+                            st.session_state.show_events = False
+                            st.query_params.clear()
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete account. Please try again.")
+                else:
+                    st.error("Username does not match.")
+
+    st.divider()
                     
     if st.button("← Back to Events"):
         st.session_state.show_settings = False
