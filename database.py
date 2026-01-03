@@ -50,6 +50,10 @@ def load_data(current_user=None):
 
         members_response = supabase.table('event_members').select("*").in_('event_id', user_event_ids).execute()
         members_raw = members_response.data if members_response.data else []
+        
+        # Load event participants (custom names)
+        event_participants_response = supabase.table('event_participants').select("*").in_('event_id', user_event_ids).execute()
+        event_participants_raw = event_participants_response.data if event_participants_response.data else []
 
         expenses_response = supabase.table('expenses').select("*").in_('event_id', user_event_ids).execute()
         expenses_raw = expenses_response.data if expenses_response.data else []
@@ -73,6 +77,14 @@ def load_data(current_user=None):
                 members_by_event[event_id] = {'members': [], 'roles': {}}
             members_by_event[event_id]['members'].append(m['username'])
             members_by_event[event_id]['roles'][m['username']] = m['role']
+        
+        # Group event participants (custom names) by event_id
+        custom_participants_by_event = {}
+        for p in event_participants_raw:
+            event_id = p['event_id']
+            if event_id not in custom_participants_by_event:
+                custom_participants_by_event[event_id] = []
+            custom_participants_by_event[event_id].append(p['participant_name'])
 
         # Group expenses by event_id
         expenses_by_event = {}
@@ -108,6 +120,12 @@ def load_data(current_user=None):
             event['members'] = event_data['members']
             event['roles'] = event_data['roles']
             
+            # Add custom participants (non-users)
+            event['custom_participants'] = custom_participants_by_event.get(event_id, [])
+            
+            # Create combined list of all participants (users + custom names)
+            event['all_participants'] = event['members'] + event['custom_participants']
+            
             # Add expenses with participants (O(1) lookup)
             event_expenses = expenses_by_event.get(event_id, [])
             for exp in event_expenses:
@@ -125,6 +143,7 @@ def load_data(current_user=None):
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
         return {'users': [], 'events': []}
+
 
 # ===== SIMPLIFIED CRUD OPERATIONS =====
 
@@ -543,3 +562,47 @@ def get_user_current_event(username):
     except Exception as e:
         print(f"Error fetching user event: {e}")
         return None
+
+# --- Event Participants (Custom Names) ---
+
+def add_event_participant(event_id, participant_name):
+    """Add a custom participant (non-user) to an event."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    try:
+        supabase.table('event_participants').insert({
+            'event_id': event_id,
+            'participant_name': participant_name,
+            'is_user': False
+        }).execute()
+        load_data.clear()  # Clear cache
+        return True
+    except Exception as e:
+        st.error(f"Failed to add participant: {str(e)}")
+        return False
+
+def remove_event_participant(event_id, participant_name):
+    """Remove a custom participant from an event."""
+    supabase = init_connection()
+    if not supabase:
+        return False
+    try:
+        supabase.table('event_participants').delete().eq('event_id', event_id).eq('participant_name', participant_name).execute()
+        load_data.clear()  # Clear cache
+        return True
+    except Exception as e:
+        st.error(f"Failed to remove participant: {str(e)}")
+        return False
+
+def get_event_participants(event_id):
+    """Get all custom participants for an event."""
+    supabase = init_connection()
+    if not supabase:
+        return []
+    try:
+        response = supabase.table('event_participants').select("participant_name").eq('event_id', event_id).execute()
+        return [p['participant_name'] for p in (response.data or [])]
+    except Exception:
+        return []
+
