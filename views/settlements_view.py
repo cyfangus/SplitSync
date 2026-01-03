@@ -12,8 +12,9 @@ def render_settle_expenses(current_event, data):
     if 'settlements' not in current_event:
         current_event['settlements'] = []
     
-    # Calculate current debts
-    debts = calculate_debts(current_event['expenses'], current_event['members'])
+    # Calculate current debts using all participants (users + custom names)
+    all_participants = current_event.get('all_participants', current_event['members'])
+    debts = calculate_debts(current_event['expenses'], all_participants)
     
     # Apply existing settlements to reduce debts
     for settlement in current_event.get('settlements', []):
@@ -206,8 +207,9 @@ Thanks!
     
     payer = st.session_state.current_user
     if is_admin():
-        st.caption("👑 Admin Mode: You can record payments for any member.")
-        payer = st.selectbox("From (Payer):", current_event['members'], index=current_event['members'].index(payer))
+        st.caption("👑 Admin Mode: You can record payments for any participant.")
+        all_participants = current_event.get('all_participants', current_event['members'])
+        payer = st.selectbox("From (Payer):", all_participants, index=all_participants.index(payer) if payer in all_participants else 0)
     else:
         st.caption("Use this to record when you've paid someone back.")
     
@@ -224,7 +226,8 @@ Thanks!
     
     with st.form("record_payment"):
         # Select recipient (exclude payer)
-        possible_recipients = [m for m in current_event['members'] if m != payer]
+        all_participants = current_event.get('all_participants', current_event['members'])
+        possible_recipients = [m for m in all_participants if m != payer]
         
         if not possible_recipients:
             st.warning("No other members in this event to pay.")

@@ -50,7 +50,9 @@ def render_event_dashboard(current_event, data):
         💡 **Tip:** You can add expenses in different currencies and we'll convert them automatically!
         """)
     else:
-        debts = calculate_debts(current_event['expenses'], current_event['members'])
+        # Use all participants (users + custom names) for debt calculation
+        all_participants = current_event.get('all_participants', current_event['members'])
+        debts = calculate_debts(current_event['expenses'], all_participants)
         
         col1, col2 = st.columns(2)
         total_unsettled = unsettled_df['amount'].sum() if not unsettled_df.empty else 0
@@ -117,6 +119,24 @@ def render_event_dashboard(current_event, data):
             status_color = "#28a745" if row['settled'] else "#ffc107"
             status_text = "Settled" if row['settled'] else "Pending"
             
+            # Get category (with default if missing)
+            category = row.get('category', '💰 Other')
+            
+            # Format created_at timestamp if available
+            created_at_display = ""
+            if 'created_at' in row and pd.notna(row['created_at']):
+                try:
+                    created_dt = pd.to_datetime(row['created_at'])
+                    created_at_display = f"🕒 Recorded: {created_dt.strftime('%b %d, %Y %I:%M %p')}"
+                except:
+                    created_at_display = ""
+            
+            # Format transaction date
+            try:
+                trans_date = pd.to_datetime(row['date']).strftime('%b %d, %Y')
+            except:
+                trans_date = str(row['date'])
+            
             st.markdown(f"""
             <div style="
                 background-color: white;
@@ -126,12 +146,20 @@ def render_event_dashboard(current_event, data):
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 border: 1px solid #e9ecef;
             ">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <span style="font-weight: bold; font-size: 1.1em;">{row['title']}</span>
-                    <span style="font-weight: bold; font-size: 1.1em;">{row['display_amount']}</span>
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 0.3rem;">{row['title']}</div>
+                        <div style="font-size: 0.85em; color: #666;">{category}</div>
+                    </div>
+                    <span style="font-weight: bold; font-size: 1.2em; color: #2c3e50;">{row['display_amount']}</span>
+                </div>
+                <div style="font-size: 0.9em; color: #666; margin-bottom: 0.3rem;">
+                    📅 Transaction Date: {trans_date}
+                </div>
+                <div style="font-size: 0.85em; color: #888; margin-bottom: 0.5rem;">
+                    {created_at_display}
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.9em; color: #666;">
-                    <span>📅 {row['date']}</span>
                     <span>👤 Paid by {row['payer']}</span>
                 </div>
                 <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #f0f0f0; font-size: 0.85em; display: flex; justify-content: space-between;">
@@ -140,3 +168,4 @@ def render_event_dashboard(current_event, data):
                 </div>
             </div>
             """, unsafe_allow_html=True)
+

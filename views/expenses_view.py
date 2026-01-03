@@ -128,7 +128,10 @@ def render_add_expense(current_event):
                         st.caption(f"= {amount_in_base:.2f}")
             
         
-        payer = st.selectbox("Paid By", current_event['members'], index=current_event['members'].index(st.session_state.current_user) if st.session_state.current_user in current_event['members'] else 0)
+        # Get all participants (users + custom names)
+        all_participants = current_event.get('all_participants', current_event['members'])
+        
+        payer = st.selectbox("Paid By", all_participants, index=all_participants.index(st.session_state.current_user) if st.session_state.current_user in all_participants else 0)
         
         # Smart Category Prediction
         predicted_category = predict_category(title, all_categories) if title else all_categories[0]
@@ -178,7 +181,7 @@ def render_add_expense(current_event):
         if not custom_category.strip() and (manual_category == predicted_category or 'manual_cat_select' not in locals()):
             category = predicted_category
         
-        involved = st.multiselect("Split Among", current_event['members'], default=current_event['members'])
+        involved = st.multiselect("Split Among", all_participants, default=all_participants)
         date = st.date_input("Date", datetime.today())
         
         submitted = st.form_submit_button("Save Expense", type="primary")
@@ -404,13 +407,16 @@ def render_edit_expenses(current_event):
                             val_base = float(initial_amount_base)
                             new_amount_base = st.number_input(f"Equivalent ({event_currency})", min_value=0.01, value=val_base)
                 
+                # Get all participants (users + custom names)
+                all_participants = current_event.get('all_participants', current_event['members'])
+                
                 # Get current payer index
                 try:
-                    payer_idx = current_event['members'].index(selected_expense['payer'])
+                    payer_idx = all_participants.index(selected_expense['payer'])
                 except ValueError:
                     payer_idx = 0
                 
-                new_payer = st.selectbox("Paid By", current_event['members'], index=payer_idx)
+                new_payer = st.selectbox("Paid By", all_participants, index=payer_idx)
                 
                 # Get current category index
                 try:
@@ -421,8 +427,8 @@ def render_edit_expenses(current_event):
                 new_category = st.selectbox("Category", all_categories, index=cat_idx)
                 
                 # Handle involved members
-                current_involved = selected_expense.get('involved', current_event['members'])
-                new_involved = st.multiselect("Split Among", current_event['members'], default=current_involved)
+                current_involved = selected_expense.get('involved', all_participants)
+                new_involved = st.multiselect("Split Among", all_participants, default=current_involved)
                 
                 # Parse date
                 try:
