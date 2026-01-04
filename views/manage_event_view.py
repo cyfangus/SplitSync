@@ -174,78 +174,78 @@ Let's split costs easily! 💸"""
     
     st.divider()
     
-    # Add New Members Section
-    st.subheader("➕ Add New Members")
+    # --- ADDING NEW MEMBERS ---
+    st.divider()
     
-    # Tabs for different member types
-    tab1, tab2 = st.tabs(["Add Registered User", "Add Custom Member"])
+    # 1. ADD BY NAME (MOST OBVIOUS)
+    st.subheader("➕ Add Member by Name (No account needed)")
+    st.info("💡 Use this if your friend doesn't have a SplitSync account. You can still track expenses for them!")
     
-    with tab1:
-        st.markdown("### 👤 Add via Username")
-        st.caption("Add someone who already has a SplitSync account.")
+    if is_admin():
+        if 'custom_added' not in st.session_state:
+            st.session_state.custom_added = False
         
-        if 'member_added' not in st.session_state:
-            st.session_state.member_added = False
-        
-        if st.session_state.member_added:
-            st.success("✅ User added successfully!")
-            st.session_state.member_added = False
+        if st.session_state.custom_added:
+            st.success("✅ Custom member added successfully!")
+            st.session_state.custom_added = False
             
-        with st.form("add_member_form", clear_on_submit=True):
-            new_member_username = st.text_input("Username", placeholder="e.g., johndoe")
-            submitted = st.form_submit_button("Add User", type="primary")
+        with st.form("add_custom_member_form", clear_on_submit=True):
+            new_name = st.text_input("Person's Name", placeholder="e.g., Sarah")
+            st.caption("This name will show up in 'Paid By' and 'Split Among' when adding expenses.")
+            submitted_custom = st.form_submit_button("Add to Event by Name", type="primary")
             
-            if submitted:
-                if not new_member_username.strip():
-                    st.error("Please enter a username.")
+            if submitted_custom:
+                if not new_name.strip():
+                    st.error("Please enter a name.")
+                elif new_name.strip() in current_event.get('all_participants', []):
+                    st.warning("That name is already in the event.")
                 else:
-                    # Check if user exists
-                    user_exists = any(u['username'] == new_member_username.strip() for u in data['users'])
-                    if not user_exists:
-                        st.error("User not found.")
-                    elif new_member_username.strip() in current_event['members']:
-                        st.warning("User already in event.")
-                    else:
-                        with st.spinner("👥 Adding member..."):
-                            if add_event_member(current_event['id'], new_member_username.strip()):
-                                st.session_state.data = load_data(st.session_state.current_user)
-                                st.session_state.member_added = True
-                                st.rerun()
-                            else:
-                                st.error("Failed to add member.")
-                                
-    with tab2:
-        st.markdown("### 📝 Add Custom Member")
-        st.caption("Add names of friends who don't have accounts. They can still be included in expenses!")
+                    with st.spinner("👤 Adding..."):
+                        if add_custom_member(current_event['id'], new_name.strip()):
+                            st.session_state.data = load_data(st.session_state.current_user)
+                            st.session_state.custom_added = True
+                            st.rerun()
+                        else:
+                            st.error("Failed to add.")
+    else:
+        st.warning("👑 Admin only: Only event admins can add members by name.")
+        st.info("Ask the event creator or an admin to add friends who don't have accounts.")
+
+    st.write("") # Spacer
+    
+    # 2. ADD BY USERNAME
+    st.subheader("👤 Add Member by Username")
+    st.caption("Use this for people who already have a SplitSync account.")
+    
+    if 'member_added' not in st.session_state:
+        st.session_state.member_added = False
+    
+    if st.session_state.member_added:
+        st.success("✅ User added successfully!")
+        st.session_state.member_added = False
         
-        if is_admin():
-            if 'custom_added' not in st.session_state:
-                st.session_state.custom_added = False
-            
-            if st.session_state.custom_added:
-                st.success("✅ Custom member added!")
-                st.session_state.custom_added = False
-                
-            with st.form("add_custom_member_form", clear_on_submit=True):
-                new_name = st.text_input("Full Name", placeholder="e.g., Sarah Miller")
-                submitted_custom = st.form_submit_button("Add Custom Member", type="primary")
-                
-                if submitted_custom:
-                    if not new_name.strip():
-                        st.error("Please enter a name.")
-                    elif new_name.strip() in current_event.get('all_participants', []):
-                        st.warning("This name is already in the event.")
-                    else:
-                        with st.spinner("👤 Adding custom member..."):
-                            if add_custom_member(current_event['id'], new_name.strip()):
-                                st.session_state.data = load_data(st.session_state.current_user)
-                                st.session_state.custom_added = True
-                                st.rerun()
-                            else:
-                                st.error("Failed to add custom member.")
-        else:
-            st.warning("👑 Only admins can add custom members.")
-            st.info("Ask an admin to add names for group members without accounts.")
+    with st.form("add_member_form", clear_on_submit=True):
+        new_member_username = st.text_input("SplitSync Username", placeholder="e.g., johndoe")
+        submitted = st.form_submit_button("Add via Username", type="secondary")
+        
+        if submitted:
+            if not new_member_username.strip():
+                st.error("Enter a username.")
+            else:
+                user_exists = any(u['username'] == new_member_username.strip() for u in data['users'])
+                if not user_exists:
+                    st.error("User not found.")
+                elif new_member_username.strip() in current_event['members']:
+                    st.warning("Already in event.")
+                else:
+                    with st.spinner("👥 Adding..."):
+                        if add_event_member(current_event['id'], new_member_username.strip()):
+                            st.session_state.data = load_data(st.session_state.current_user)
+                            st.session_state.member_added = True
+                            st.rerun()
+                        else:
+                            st.error("Failed to add member.")
+
 
 
     
