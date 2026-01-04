@@ -138,9 +138,9 @@ def render_add_expense(current_event):
             is_admin = roles.get(st.session_state.current_user) == 'admin'
             
             if is_admin:
-                st.info("💡 **Tip:** Need to add someone who doesn't have an account? Go to **Manage Event** → **Add Custom Member**")
+                st.info("💡 **Tip:** Need to add a friend who isn't on SplitSync? Go to **Manage Event** ➔ **Add New Member** and use the 'Add as Custom Member' button.")
             else:
-                st.info("💡 **Tip:** Need to add someone who doesn't have an account? Ask an event admin to add them in **Manage Event**")
+                st.info("💡 **Tip:** Need to add a friend? Ask an **Admin** to add them as a 'Custom Member' in the **Manage Event** page.")
         
         payer = st.selectbox("Paid By", all_participants, index=all_participants.index(st.session_state.current_user) if st.session_state.current_user in all_participants else 0)
         

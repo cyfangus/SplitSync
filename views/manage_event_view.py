@@ -1,6 +1,7 @@
 import streamlit as st
 import base64
 import urllib.parse
+import time
 from database import remove_event_member, add_event_member, update_member_role, update_event, delete_event, load_data, add_custom_member, remove_custom_member
 from ui_utils import render_avatar
 
@@ -84,6 +85,7 @@ Let's split costs easily! 💸"""
     # Display members in a nice format (Registered Users)
     for member in current_event['members']:
         role = current_event['roles'].get(member, 'member')
+        is_member_admin = role == 'admin'
         
         col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
         
@@ -91,8 +93,8 @@ Let's split costs easily! 💸"""
             render_avatar(member, size=40)
         
         with col2:
-            st.write(f"**{member}**")
-            st.caption(f"User • {role.title()}")
+            st.write(f"**{member}**" + (" 👑" if is_member_admin else ""))
+            st.caption(f"Registered User" + (" • Admin" if is_member_admin else ""))
         
         with col3:
             if st.button("View Profile", key=f"view_{member}"):
@@ -172,67 +174,83 @@ Let's split costs easily! 💸"""
                         st.session_state.confirm_remove_custom = participant
                         st.rerun()
     
-    st.divider()
+    st.write("") # Spacer
     
-    # --- ADDING NEW MEMBERS ---
-    st.divider()
-    st.markdown("## ➕ Add New Member")
-    st.write("How would you like to add this person?")
+    # --- ADD NEW MEMBER SECTION ---
+    st.markdown("---")
+    st.markdown("## 🚀 Add New Member")
     
-    # Simple choice
+    # Visible Role Info for User (Helpful for debugging)
+    user_role = current_event.get('roles', {}).get(st.session_state.current_user, 'member')
+    st.caption(f"Your Current Role: **{user_role.title()}**")
+
     if is_admin():
+        st.success("✨ **Admin Access**: Use the buttons below to add members.")
+        
         with st.container():
-            st.info("💡 **Custom Member**: Just a name (e.g. 'Sarah'). Best for friends who don't have SplitSync.\n\n👤 **Registered User**: Links to a real SplitSync account using their username.")
+            st.markdown("""
+            <div style="background-color: #f0f7ff; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; margin-bottom: 20px;">
+                <h4 style="margin-top: 0; color: #0056b3;">How to add people:</h4>
+                <ul style="margin-bottom: 0;">
+                    <li><b>Option A (Custom)</b>: Type a name like 'Mom' or 'Sarah'. No account needed!</li>
+                    <li><b>Option B (Linked)</b>: Type a SplitSync username to link their real account.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # The Input Field
+            member_to_add = st.text_input("Enter Name or Username", placeholder="e.g. Sarah Miller", key="member_input_field")
             
-            # Use a form but with very clear logic
-            with st.form("new_add_member_form", clear_on_submit=True):
-                member_to_add = st.text_input("Name or Username", placeholder="e.g., Sarah or johndoe")
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    add_custom = st.form_submit_button("➕ Add as Custom Member", type="primary", use_container_width=True)
-                with c2:
-                    add_user = st.form_submit_button("👤 Add as Registered User", type="secondary", use_container_width=True)
-                
-                if add_custom:
-                    name = member_to_add.strip()
-                    if not name:
-                        st.error("Please enter a name.")
-                    elif name in current_event.get('all_participants', []):
-                        st.warning(f"'{name}' is already in this event.")
+            # The TWO BUTTONS
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                add_custom_btn = st.button("➕ Add as Custom Member", type="primary", use_container_width=True, help="Adds just a name to the list.")
+            
+            with col_b:
+                add_user_btn = st.button("👤 Add as Registered User", type="secondary", use_container_width=True, help="Links to a real SplitSync account.")
+            
+            # Logic for Custom Member
+            if add_custom_btn:
+                val = member_to_add.strip()
+                if not val:
+                    st.error("Please enter a name first.")
+                elif val in current_event.get('all_participants', []):
+                    st.warning(f"'{val}' is already in this event.")
+                else:
+                    with st.spinner(f"Adding '{val}'..."):
+                        if add_custom_member(current_event['id'], val):
+                            load_data.clear()
+                            st.success(f"✅ Added {val}!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error("Failed to add. If this is a Demo Event, please create a real event first!")
+            
+            # Logic for Registered User
+            if add_user_btn:
+                val = member_to_add.strip()
+                if not val:
+                    st.error("Please enter a username first.")
+                elif val in current_event['members']:
+                    st.warning(f"'{val}' is already in the event.")
+                else:
+                    user_exists = any(u['username'] == val for u in data['users'])
+                    if not user_exists:
+                        st.error(f"❌ User '{val}' not found. Did you mean to use 'Add as Custom Member'?")
                     else:
-                        with st.spinner(f"Adding {name}..."):
-                            if add_custom_member(current_event['id'], name):
-                                load_data.clear() # Clear cache
-                                st.success(f"✅ Added {name} as a custom member!")
-                                time.sleep(1) # Visual feedback
+                        with st.spinner(f"Linking '{val}'..."):
+                            if add_event_member(current_event['id'], val):
+                                load_data.clear()
+                                st.success(f"✅ Linked {val}!")
+                                time.sleep(0.5)
                                 st.rerun()
                             else:
-                                st.error("Failed to add custom member.")
-                
-                if add_user:
-                    username = member_to_add.strip()
-                    if not username:
-                        st.error("Please enter a username.")
-                    elif username in current_event['members']:
-                        st.warning(f"User '{username}' is already in this event.")
-                    else:
-                        # Check if user exists in our local list first
-                        user_exists = any(u['username'] == username for u in data['users'])
-                        if not user_exists:
-                            st.error(f"❌ Registered user '{username}' not found. If they don't have an account, use 'Add as Custom Member' instead!")
-                        else:
-                            with st.spinner(f"Linking user {username}..."):
-                                if add_event_member(current_event['id'], username):
-                                    load_data.clear() # Clear cache
-                                    st.success(f"✅ User {username} added successfully!")
-                                    time.sleep(1)
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to add registered user.")
+                                st.error("Failed to add.")
     else:
-        st.warning("👑 Admin Only")
-        st.info("Only event administrators can add new members.")
+        st.warning("👑 **Admin Only**")
+        st.info("You are currently a **Member**. Only **Admins** can add or remove people from this event.")
+        st.caption("Ask the person who created this event to promote you to Admin.")
 
 
 
