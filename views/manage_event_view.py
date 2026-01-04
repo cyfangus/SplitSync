@@ -176,46 +176,63 @@ Let's split costs easily! 💸"""
     
     # --- ADDING NEW MEMBERS ---
     st.divider()
-    st.subheader("➕ Add Member")
+    st.markdown("## ➕ Add New Member")
+    st.write("How would you like to add this person?")
     
+    # Simple choice
     if is_admin():
-        st.info("💡 Type a username to link an account, or just type a name (like 'Mom') to add a custom member.")
-        
-        with st.form("unified_add_member_form", clear_on_submit=True):
-            member_input = st.text_input("Username or Name of person", placeholder="e.g., sarah123 or Sarah Miller")
-            submitted = st.form_submit_button("Add to Event", type="primary", use_container_width=True)
+        with st.container():
+            st.info("💡 **Custom Member**: Just a name (e.g. 'Sarah'). Best for friends who don't have SplitSync.\n\n👤 **Registered User**: Links to a real SplitSync account using their username.")
             
-            if submitted:
-                input_val = member_input.strip()
-                if not input_val:
-                    st.error("Please enter a name or username.")
-                elif input_val in current_event.get('all_participants', []):
-                    st.warning(f"'{input_val}' is already in this event.")
-                else:
-                    # Check if it's a registered user
-                    registered_user = next((u for u in data['users'] if u['username'] == input_val), None)
-                    
-                    if registered_user:
-                        with st.spinner(f"👥 Adding user {input_val}..."):
-                            if add_event_member(current_event['id'], input_val):
-                                st.session_state.data = load_data(st.session_state.current_user)
-                                st.success(f"✅ Added registered user {input_val}!")
-                                st.rerun()
-                            else:
-                                st.error("Failed to add user.")
+            # Use a form but with very clear logic
+            with st.form("new_add_member_form", clear_on_submit=True):
+                member_to_add = st.text_input("Name or Username", placeholder="e.g., Sarah or johndoe")
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    add_custom = st.form_submit_button("➕ Add as Custom Member", type="primary", use_container_width=True)
+                with c2:
+                    add_user = st.form_submit_button("👤 Add as Registered User", type="secondary", use_container_width=True)
+                
+                if add_custom:
+                    name = member_to_add.strip()
+                    if not name:
+                        st.error("Please enter a name.")
+                    elif name in current_event.get('all_participants', []):
+                        st.warning(f"'{name}' is already in this event.")
                     else:
-                        # Not a registered user, suggest adding as custom member
-                        st.info(f"❓ User '{input_val}' not found. Adding them as a **Custom Member** (no account needed)...")
-                        with st.spinner(f"👤 Adding custom member {input_val}..."):
-                            if add_custom_member(current_event['id'], input_val):
-                                st.session_state.data = load_data(st.session_state.current_user)
-                                st.success(f"✅ Added custom member {input_val}!")
+                        with st.spinner(f"Adding {name}..."):
+                            if add_custom_member(current_event['id'], name):
+                                load_data.clear() # Clear cache
+                                st.success(f"✅ Added {name} as a custom member!")
+                                time.sleep(1) # Visual feedback
                                 st.rerun()
                             else:
                                 st.error("Failed to add custom member.")
+                
+                if add_user:
+                    username = member_to_add.strip()
+                    if not username:
+                        st.error("Please enter a username.")
+                    elif username in current_event['members']:
+                        st.warning(f"User '{username}' is already in this event.")
+                    else:
+                        # Check if user exists in our local list first
+                        user_exists = any(u['username'] == username for u in data['users'])
+                        if not user_exists:
+                            st.error(f"❌ Registered user '{username}' not found. If they don't have an account, use 'Add as Custom Member' instead!")
+                        else:
+                            with st.spinner(f"Linking user {username}..."):
+                                if add_event_member(current_event['id'], username):
+                                    load_data.clear() # Clear cache
+                                    st.success(f"✅ User {username} added successfully!")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to add registered user.")
     else:
         st.warning("👑 Admin Only")
-        st.info("Only event administrators can add new members. Please contact an admin to add friends to this event.")
+        st.info("Only event administrators can add new members.")
 
 
 
