@@ -117,6 +117,10 @@ def safe_eval_formula(formula_str):
     
     # Try to evaluate as a formula
     try:
+        # Handle Excel-style leading '=' 
+        if formula_str.startswith('='):
+            formula_str = formula_str[1:]
+            
         # Only allow safe characters: digits, operators, parentheses, decimal point
         if re.match(r'^[\d\s\+\-\*\/\(\)\.]+$', formula_str):
             result = eval(formula_str)
