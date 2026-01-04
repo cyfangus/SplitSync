@@ -397,26 +397,54 @@ def render_edit_expenses(current_event):
                 st.caption("✏️ Edit the fields below (pre-filled with current values)")
                 new_title = st.text_input("Description", value=selected_expense['title'])
                 
-                # Dynamic Inputs
-                new_amount_base = 0.0
-                new_amount_orig = 0.0
+                # Dynamic Inputs with Formula Support
+                amount_in_base = 0.0
+                amount_in_original = 0.0
                 
                 if new_currency == event_currency:
-                    new_amount_base = st.number_input(f"Amount ({event_currency})", min_value=0.01, value=float(initial_amount_base))
+                    st.caption(f"💡 Math formulas supported! e.g., `12.50 * 3 + 5`")
+                    col_amt, col_calc = st.columns([2, 1])
+                    with col_amt:
+                        amt_formula = st.text_input(
+                            f"Amount ({event_currency})", 
+                            value=str(initial_amount_base),
+                            help="Enter a number or formula"
+                        )
+                        amount_in_base = safe_eval_formula(amt_formula)
+                    with col_calc:
+                        if amt_formula:
+                            st.metric("Calculated", f"{amount_in_base:.2f}")
                 else:
+                    st.caption(f"💡 Math formulas supported! e.g., `10 + 5`")
                     if conversion_mode == "Auto (Market Rate)":
-                        # If switching to Auto, try to use original amount if available, else base
-                        val = float(initial_amount_orig) if initial_currency == new_currency else 1.0
-                        new_amount_orig = st.number_input(f"Amount ({new_currency})", min_value=0.01, value=val)
-                        st.caption(f"Will be converted to {event_currency} on submit.")
+                        col_amt, col_calc = st.columns([2, 1])
+                        with col_amt:
+                            # Use original amount if it was in the same currency, else default to current base
+                            val_to_show = str(initial_amount_orig) if initial_currency == new_currency else str(initial_amount_base)
+                            amt_formula_orig = st.text_input(
+                                f"Amount ({new_currency})", 
+                                value=val_to_show,
+                                help="Enter a number or formula"
+                            )
+                            amount_in_original = safe_eval_formula(amt_formula_orig)
+                        with col_calc:
+                            if amt_formula_orig:
+                                st.metric("Calculated", f"{amount_in_original:.2f}")
+                                st.caption(f"≈ {event_currency} conversion")
                     else:
                         c1, c2 = st.columns(2)
                         with c1:
-                            val_orig = float(initial_amount_orig) if initial_currency == new_currency else 1.0
-                            new_amount_orig = st.number_input(f"Spent ({new_currency})", min_value=0.01, value=val_orig)
+                            val_orig = str(initial_amount_orig) if initial_currency == new_currency else "1.0"
+                            amt_orig_formula = st.text_input(f"Spent ({new_currency})", value=val_orig)
+                            amount_in_original = safe_eval_formula(amt_orig_formula)
+                            if amt_orig_formula:
+                                st.caption(f"= {amount_in_original:.2f}")
                         with c2:
-                            val_base = float(initial_amount_base)
-                            new_amount_base = st.number_input(f"Equivalent ({event_currency})", min_value=0.01, value=val_base)
+                            val_base = str(initial_amount_base)
+                            amt_base_formula = st.text_input(f"Equivalent ({event_currency})", value=val_base)
+                            amount_in_base = safe_eval_formula(amt_base_formula)
+                            if amt_base_formula:
+                                st.caption(f"= {amount_in_base:.2f}")
                 
                 # Get all participants (users + custom names)
                 all_participants = current_event.get('all_participants', current_event['members'])
@@ -449,57 +477,63 @@ def render_edit_expenses(current_event):
                 
                 new_date = st.date_input("Date", value=current_date)
                 
-                submitted = st.form_submit_button("Update Expense", type="primary")
+                submitted = st.form_submit_button("Update Expense", type="primary", use_container_width=True)
                 
                 if submitted:
                     if new_title and new_involved:
-                        with st.spinner("✏️ Updating expense..."):
-                            # Logic to determine final amounts
-                            final_amount = 0.0
-                            original_amt = None
-                            original_curr = None
-                            exch_rate = None
-                            
-                            if new_currency == event_currency:
-                                final_amount = new_amount_base
-                            else:
-                                original_curr = new_currency
-                                original_amt = new_amount_orig
+                        # Validate amounts
+                        if (new_currency == event_currency and amount_in_base <= 0) or \
+                           (new_currency != event_currency and amount_in_original <= 0 and conversion_mode == "Auto (Market Rate)") or \
+                           (new_currency != event_currency and conversion_mode == "Manual (Set Base Amount)" and (amount_in_base <= 0 or amount_in_original <= 0)):
+                            st.error("Please enter a valid amount greater than 0.")
+                        else:
+                            with st.spinner("✏️ Updating expense..."):
+                                # Logic to determine final amounts
+                                final_amount = 0.0
+                                original_amt = None
+                                original_curr = None
+                                exch_rate = None
                                 
-                                if conversion_mode == "Auto (Market Rate)":
-                                    rate = get_exchange_rate(new_currency, event_currency)
-                                    if rate:
-                                        final_amount = new_amount_orig * rate
-                                        exch_rate = rate
-                                    else:
-                                        st.error("Could not fetch rate. Using 1:1.")
-                                        final_amount = new_amount_orig
-                                        exch_rate = 1.0
+                                if new_currency == event_currency:
+                                    final_amount = amount_in_base
                                 else:
-                                    final_amount = new_amount_base
-                                    if new_amount_orig > 0:
-                                        exch_rate = final_amount / new_amount_orig
-                            
-                            updates = {
-                                'title': new_title,
-                                'amount': final_amount,
-                                'original_amount': original_amt,
-                                'original_currency': original_curr,
-                                'exchange_rate': exch_rate,
-                                'payer': new_payer,
-                                'category': new_category,
-                                'involved': new_involved,
-                                'date': str(new_date),
-                                'settled': selected_expense.get('settled', False)
-                            }
-                            
-                            if update_expense(selected_expense['id'], updates):
-                                st.session_state.expense_updated = True
-                                st.rerun()
-                            else:
-                                st.error("Failed to update expense.")
+                                    original_curr = new_currency
+                                    original_amt = amount_in_original
+                                    
+                                    if conversion_mode == "Auto (Market Rate)":
+                                        rate = get_exchange_rate(new_currency, event_currency)
+                                        if rate:
+                                            final_amount = amount_in_original * rate
+                                            exch_rate = rate
+                                        else:
+                                            st.error("Could not fetch rate. Using 1:1.")
+                                            final_amount = amount_in_original
+                                            exch_rate = 1.0
+                                    else:
+                                        final_amount = amount_in_base
+                                        if amount_in_original > 0:
+                                            exch_rate = final_amount / amount_in_original
+                                
+                                updates = {
+                                    'title': new_title,
+                                    'amount': final_amount,
+                                    'original_amount': original_amt,
+                                    'original_currency': original_curr,
+                                    'exchange_rate': exch_rate,
+                                    'payer': new_payer,
+                                    'category': new_category,
+                                    'involved': new_involved,
+                                    'date': str(new_date),
+                                    'settled': selected_expense.get('settled', False)
+                                }
+                                
+                                if update_expense(selected_expense['id'], updates):
+                                    st.session_state.expense_updated = True
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update expense.")
                     else:
-                        st.error("Please fill all required fields.")
+                        st.error("Please fill all required fields (Description and Split Among).")
             
             
             # Delete button with confirmation
