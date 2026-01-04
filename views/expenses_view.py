@@ -76,7 +76,7 @@ def render_add_expense(current_event):
         all_categories.extend([f"  → {sub}" for sub in subcats])
     all_categories.extend(custom_categories)
 
-    with st.form("add_expense", clear_on_submit=True):
+    with st.form("add_expense_form_main", clear_on_submit=True):
         title = st.text_input("Description")
         
         # Dynamic Inputs with Formula Support
@@ -393,7 +393,8 @@ def render_edit_expenses(current_event):
                 all_categories.extend([f"  → {sub}" for sub in subcats])
             all_categories.extend(custom_categories)
 
-            with st.form("edit_expense_form"):
+            # 2. Main Edit Form
+            with st.form(f"edit_expense_form_{selected_expense['id']}"):
                 st.caption("✏️ Edit the fields below (pre-filled with current values)")
                 new_title = st.text_input("Description", value=selected_expense['title'])
                 
