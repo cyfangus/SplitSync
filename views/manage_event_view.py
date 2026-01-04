@@ -161,48 +161,47 @@ Let's split costs easily! 💸"""
     
     st.divider()
     
-    # Add Custom Participant Section (Available to All Users)
-    st.subheader("➕ Add Participant to Event")
-    st.info("💡 Add names of people who don't have accounts. They can still be included in expenses!")
-    
-    if 'participant_added' not in st.session_state:
-        st.session_state.participant_added = False
-    
-    if st.session_state.participant_added:
-        st.success("✅ Participant added successfully!")
-        st.session_state.participant_added = False
-    
-    with st.form("add_participant_form", clear_on_submit=True):
-        new_participant_name = st.text_input("Enter Participant Name", placeholder="e.g., John Doe")
-        submitted_participant = st.form_submit_button("Add Participant", type="primary")
+    # Add Custom Participant Section (Admin Only)
+    if is_admin():
+        st.subheader("➕ Add Custom Participant (Admin Only)")
+        st.info("💡 Add names of people who don't have accounts. They can still be included in expenses!")
         
-        if submitted_participant:
-            if not new_participant_name.strip():
-                st.error("Please enter a name.")
-            elif new_participant_name.strip() in current_event.get('all_participants', []):
-                st.warning("This name is already in the event.")
-            else:
-                with st.spinner("👤 Adding participant..."):
-                    if add_event_participant(current_event['id'], new_participant_name.strip()):
-                        st.session_state.data = load_data(st.session_state.current_user)
-                        st.session_state.participant_added = True
-                        st.rerun()
-                    else:
-                        st.error("Failed to add participant.")
-    
-    # Display custom participants
-    custom_participants = current_event.get('custom_participants', [])
-    if custom_participants:
-        st.subheader("📋 Custom Participants")
-        st.caption("These people can be included in expenses but don't have accounts.")
+        if 'participant_added' not in st.session_state:
+            st.session_state.participant_added = False
         
-        for participant in custom_participants:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"👤 **{participant}**")
-            with col2:
-                # Only admins can remove participants
-                if is_admin():
+        if st.session_state.participant_added:
+            st.success("✅ Participant added successfully!")
+            st.session_state.participant_added = False
+        
+        with st.form("add_participant_form", clear_on_submit=True):
+            new_participant_name = st.text_input("Enter Participant Name", placeholder="e.g., John Doe")
+            submitted_participant = st.form_submit_button("Add Participant", type="primary")
+            
+            if submitted_participant:
+                if not new_participant_name.strip():
+                    st.error("Please enter a name.")
+                elif new_participant_name.strip() in current_event.get('all_participants', []):
+                    st.warning("This name is already in the event.")
+                else:
+                    with st.spinner("👤 Adding participant..."):
+                        if add_event_participant(current_event['id'], new_participant_name.strip()):
+                            st.session_state.data = load_data(st.session_state.current_user)
+                            st.session_state.participant_added = True
+                            st.rerun()
+                        else:
+                            st.error("Failed to add participant.")
+        
+        # Display custom participants
+        custom_participants = current_event.get('custom_participants', [])
+        if custom_participants:
+            st.subheader("📋 Custom Participants")
+            st.caption("These people can be included in expenses but don't have accounts.")
+            
+            for participant in custom_participants:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"👤 **{participant}**")
+                with col2:
                     # Initialize remove confirmation state
                     if 'confirm_remove_participant' not in st.session_state:
                         st.session_state.confirm_remove_participant = None
@@ -222,6 +221,7 @@ Let's split costs easily! 💸"""
                         if st.button(f"Remove", key=f"remove_part_{participant}", type="secondary"):
                             st.session_state.confirm_remove_participant = participant
                             st.rerun()
+
     
     # Role Management Section (Admin Only)
     if is_admin():

@@ -133,7 +133,14 @@ def render_add_expense(current_event):
         
         # Helpful tip for adding participants
         if len(all_participants) == len(current_event.get('members', [])):
-            st.info("💡 **Tip:** Need to add someone who doesn't have an account? Go to **Manage Event** → **Add Participant to Event**")
+            # Check if current user is admin
+            roles = current_event.get('roles', {})
+            is_admin = roles.get(st.session_state.current_user) == 'admin'
+            
+            if is_admin:
+                st.info("💡 **Tip:** Need to add someone who doesn't have an account? Go to **Manage Event** → **Add Custom Participant**")
+            else:
+                st.info("💡 **Tip:** Need to add someone who doesn't have an account? Ask an event admin to add them in **Manage Event**")
         
         payer = st.selectbox("Paid By", all_participants, index=all_participants.index(st.session_state.current_user) if st.session_state.current_user in all_participants else 0)
         
