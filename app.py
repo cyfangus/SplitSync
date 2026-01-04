@@ -139,6 +139,14 @@ if st.session_state.current_user:
     # Always reload data to ensure freshness
     st.session_state.data = load_data(st.session_state.current_user)
     
+    # CRITICAL: Keep current_event in sync with reloaded data
+    if st.session_state.current_event:
+        # Find the fresh version of the current event in the newly loaded data
+        fresh_event = next((e for e in st.session_state.data.get('events', []) 
+                           if e['id'] == st.session_state.current_event['id']), None)
+        if fresh_event:
+            st.session_state.current_event = fresh_event
+    
     # Inject demo event if requested
     if st.session_state.get('demo_loaded', False):
         from onboarding import create_demo_event

@@ -7,11 +7,13 @@ import random
 
 def create_demo_event():
     """Create a demo event with sample data for new users"""
+    current_user = st.session_state.get('current_user', 'You')
+    
     demo_event = {
         "id": "demo_event_001",
         "name": "🎯 Demo: Weekend Trip",
-        "members": ["You", "Alice", "Bob", "Charlie"],
-        "roles": {"You": "admin", "Alice": "member", "Bob": "member", "Charlie": "member"},
+        "members": [current_user, "Alice", "Bob", "Charlie"],
+        "roles": {current_user: "admin", "Alice": "member", "Bob": "member", "Charlie": "member"},
         "currency": "USD",
         "access_code": "DEMO01",
         "expenses": [
