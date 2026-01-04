@@ -138,7 +138,7 @@ def render_add_expense(current_event):
             is_admin = roles.get(st.session_state.current_user) == 'admin'
             
             if is_admin:
-                st.info("💡 **Tip:** Need to add someone who doesn't have an account? Go to **Manage Event** → **Add Custom Participant**")
+                st.info("💡 **Tip:** Need to add someone who doesn't have an account? Go to **Manage Event** → **Add Custom Member**")
             else:
                 st.info("💡 **Tip:** Need to add someone who doesn't have an account? Ask an event admin to add them in **Manage Event**")
         
