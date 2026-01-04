@@ -131,6 +131,10 @@ def render_add_expense(current_event):
         # Get all participants (users + custom names)
         all_participants = current_event.get('all_participants', current_event['members'])
         
+        # Helpful tip for adding participants
+        if len(all_participants) == len(current_event.get('members', [])):
+            st.info("💡 **Tip:** Need to add someone who doesn't have an account? Go to **Manage Event** → **Add Participant to Event**")
+        
         payer = st.selectbox("Paid By", all_participants, index=all_participants.index(st.session_state.current_user) if st.session_state.current_user in all_participants else 0)
         
         # Smart Category Prediction
