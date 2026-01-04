@@ -189,12 +189,18 @@ Let's split costs easily! 💸"""
         
         with st.container():
             st.markdown("""
-            <div style="background-color: #f0f7ff; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; margin-bottom: 20px;">
-                <h4 style="margin-top: 0; color: #0056b3;">How to add people:</h4>
-                <ul style="margin-bottom: 0;">
-                    <li><b>Option A (Custom)</b>: Type a name like 'Mom' or 'Sarah'. No account needed!</li>
-                    <li><b>Option B (Linked)</b>: Type a SplitSync username to link their real account.</li>
-                </ul>
+            <div style="padding: 1.5rem; border-radius: 12px; border: 1px solid #007bff44; background-color: rgba(0, 123, 255, 0.05); color: inherit; margin-bottom: 1.5rem;">
+                <h4 style="margin-top: 0; color: #007bff; border-bottom: 1px solid #007bff22; padding-bottom: 10px;">📋 How to add members:</h4>
+                <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <b style="color: #007bff;">Option A: Custom Member</b><br>
+                        <span style="font-size: 0.9em; opacity: 0.8;">Just a name (e.g. 'Mom', 'Sarah'). No account needed.</span>
+                    </div>
+                    <div>
+                        <b style="color: #007bff;">Option B: Registered User</b><br>
+                        <span style="font-size: 0.9em; opacity: 0.8;">Link to a real SplitSync account using their username.</span>
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -205,10 +211,10 @@ Let's split costs easily! 💸"""
             col_a, col_b = st.columns(2)
             
             with col_a:
-                add_custom_btn = st.button("➕ Add as Custom Member", type="primary", use_container_width=True, help="Adds just a name to the list.")
+                add_custom_btn = st.button("➕ Add as Custom Member", type="primary", use_container_width=True)
             
             with col_b:
-                add_user_btn = st.button("👤 Add as Registered User", type="secondary", use_container_width=True, help="Links to a real SplitSync account.")
+                add_user_btn = st.button("👤 Add as Registered User", type="secondary", use_container_width=True)
             
             # Logic for Custom Member
             if add_custom_btn:
