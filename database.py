@@ -582,6 +582,9 @@ def add_event_participant(event_id, participant_name):
         st.error(f"Failed to add participant: {str(e)}")
         return False
 
+# Alias for user terminology
+add_custom_member = add_event_participant
+
 def remove_event_participant(event_id, participant_name):
     """Remove a custom participant from an event."""
     supabase = init_connection()
@@ -595,6 +598,9 @@ def remove_event_participant(event_id, participant_name):
         st.error(f"Failed to remove participant: {str(e)}")
         return False
 
+# Alias for user terminology
+remove_custom_member = remove_event_participant
+
 def get_event_participants(event_id):
     """Get all custom participants for an event."""
     supabase = init_connection()
@@ -605,4 +611,7 @@ def get_event_participants(event_id):
         return [p['participant_name'] for p in (response.data or [])]
     except Exception:
         return []
+
+# Alias for user terminology
+get_custom_members = get_event_participants
 
