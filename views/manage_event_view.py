@@ -1,7 +1,7 @@
 import streamlit as st
 import base64
 import urllib.parse
-from database import remove_event_member, add_event_member, update_member_role, update_event, delete_event, load_data, add_event_participant, remove_event_participant
+from database import remove_event_member, add_event_member, update_member_role, update_event, delete_event, load_data, add_custom_member, remove_custom_member
 from ui_utils import render_avatar
 
 def render_manage_event(current_event, data):
@@ -81,13 +81,9 @@ Let's split costs easily! 💸"""
     if 'roles' not in current_event:
         current_event['roles'] = {}
     
-    # Display members in a nice format
+    # Display members in a nice format (Registered Users)
     for member in current_event['members']:
         role = current_event['roles'].get(member, 'member')
-        role_emoji = "👑" if role == "admin" else "👤"
-        
-        # Get avatar for list
-        member_data = next((u for u in data['users'] if u['username'] == member), None)
         
         col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
         
@@ -96,7 +92,7 @@ Let's split costs easily! 💸"""
         
         with col2:
             st.write(f"**{member}**")
-            st.caption(f"{role.title()}")
+            st.caption(f"User • {role.title()}")
         
         with col3:
             if st.button("View Profile", key=f"view_{member}"):
@@ -125,6 +121,55 @@ Let's split costs easily! 💸"""
                 else:
                     if st.button(f"Remove", key=f"remove_{member}", type="secondary"):
                         st.session_state.confirm_remove_member = member
+                        st.rerun()
+    
+    # Display Custom Members (Participants)
+    custom_participants = current_event.get('custom_participants', [])
+    for participant in custom_participants:
+        col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
+        
+        with col1:
+            st.markdown(f"""
+                <div style="
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background-color: #f0f2f6;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-size: 20px;
+                    color: #555;
+                ">👤</div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.write(f"**{participant}**")
+            st.caption("Custom Member")
+        
+        with col3:
+            st.write("") # Spacer
+        
+        with col4:
+            if is_admin():
+                # Initialize remove confirmation state
+                if 'confirm_remove_custom' not in st.session_state:
+                    st.session_state.confirm_remove_custom = None
+                
+                if st.session_state.confirm_remove_custom == participant:
+                    if st.button(f"✅ Confirm", key=f"confirm_remove_custom_{participant}", type="primary"):
+                        with st.spinner(f"🚫 Removing {participant}..."):
+                            if remove_custom_member(current_event['id'], participant):
+                                st.success(f"Removed custom member {participant}.")
+                                st.session_state.data = load_data(st.session_state.current_user)
+                                st.session_state.confirm_remove_custom = None
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to remove {participant}.")
+                                st.session_state.confirm_remove_custom = None
+                else:
+                    if st.button(f"Remove", key=f"remove_custom_{participant}", type="secondary"):
+                        st.session_state.confirm_remove_custom = participant
                         st.rerun()
     
     st.divider()
