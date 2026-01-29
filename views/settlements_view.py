@@ -20,8 +20,8 @@ def render_settle_expenses(current_event, data):
     for settlement in current_event.get('settlements', []):
         # Find and reduce the corresponding debt
         for debt in debts:
-            if (debt['debtor'] == settlement['from_user'] and 
-                debt['creditor'] == settlement['to_user']):
+            if (debt['debtor'] == settlement['payer'] and 
+                debt['creditor'] == settlement['recipient']):
                 debt['amount'] -= settlement['amount']
                 if debt['amount'] <= 0:
                     debts.remove(debt)
@@ -347,12 +347,12 @@ Thanks!
         # Format for display with currency conversion info
         for idx, settlement in enumerate(current_event['settlements'][::-1]):  # Reverse to match sorted order
             with st.expander(
-                f"{settlement['date']} - {settlement['from_user']} → {settlement['to_user']}: {format_currency(settlement['amount'], current_event.get('currency', 'USD'))}"
+                f"{settlement['date']} - {settlement['payer']} → {settlement['recipient']}: {format_currency(settlement['amount'], current_event.get('currency', 'USD'))}"
             ):
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.write(f"**From:** {settlement['from_user']}")
-                    st.write(f"**To:** {settlement['to_user']}")
+                    st.write(f"**From:** {settlement['payer']}")
+                    st.write(f"**To:** {settlement['recipient']}")
                     st.write(f"**Date:** {settlement['date']}")
                 with col2:
                     st.write(f"**Amount:** {format_currency(settlement['amount'], current_event.get('currency', 'USD'))}")
