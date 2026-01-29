@@ -12,20 +12,9 @@ def render_settle_expenses(current_event, data):
     if 'settlements' not in current_event:
         current_event['settlements'] = []
     
-    # Calculate current debts using all participants (users + custom names)
+    # Calculate current debts using all participants (users + custom names) and settlements
     all_participants = current_event.get('all_participants', current_event['members'])
-    debts = calculate_debts(current_event['expenses'], all_participants)
-    
-    # Apply existing settlements to reduce debts
-    for settlement in current_event.get('settlements', []):
-        # Find and reduce the corresponding debt
-        for debt in debts:
-            if (debt['debtor'] == settlement['payer'] and 
-                debt['creditor'] == settlement['recipient']):
-                debt['amount'] -= settlement['amount']
-                if debt['amount'] <= 0:
-                    debts.remove(debt)
-                break
+    debts = calculate_debts(current_event['expenses'], all_participants, current_event.get('settlements', []))
     
     # Remove zero or negative debts
     debts = [d for d in debts if d['amount'] > 0.01]

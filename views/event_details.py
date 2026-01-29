@@ -52,11 +52,11 @@ def render_event_dashboard(current_event, data):
     else:
         # Use all participants (users + custom names) for debt calculation
         all_participants = current_event.get('all_participants', current_event['members'])
-        debts = calculate_debts(current_event['expenses'], all_participants)
+        debts = calculate_debts(current_event['expenses'], all_participants, current_event.get('settlements', []))
         
         col1, col2 = st.columns(2)
-        total_unsettled = unsettled_df['amount'].sum() if not unsettled_df.empty else 0
-        col1.metric("Total Unsettled", format_currency(total_unsettled, current_event.get('currency', 'USD')))
+        total_outstanding = sum(d['amount'] for d in debts)
+        col1.metric("Total Outstanding", format_currency(total_outstanding, current_event.get('currency', 'USD')))
         col2.metric("Pending Settlements", len(debts))
         
         if debts:

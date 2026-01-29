@@ -146,8 +146,8 @@ def render_settings(data):
         blocking_events = []
         
         for event in data['events']:
-            # Calculate debts for this event
-            debts = calculate_debts(event.get('expenses', []), event.get('members', []))
+            # Calculate debts for this event including settlements
+            debts = calculate_debts(event.get('expenses', []), event.get('members', []), event.get('settlements', []))
             
             # Check if user is involved in any debt
             user_debt = next((d for d in debts if d['debtor'] == st.session_state.current_user or d['creditor'] == st.session_state.current_user), None)
