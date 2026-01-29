@@ -207,6 +207,55 @@ def predict_category(description, all_categories=None):
     
     return all_categories[0] if all_categories else "💰 Other"
 
+def calculate_settlements(debts):
+    """
+    Simplify a list of debts (minimize transactions).
+    Returns list of settlements: [{'payer': str, 'recipient': str, 'amount': float}]
+    """
+    if not debts:
+        return []
+    
+    # Calculate net balances from the list of debts
+    balances = {}
+    for debt in debts:
+        debtor = debt['debtor']
+        creditor = debt['creditor']
+        amount = debt['amount']
+        
+        balances[debtor] = balances.get(debtor, 0.0) - amount
+        balances[creditor] = balances.get(creditor, 0.0) + amount
+    
+    # Convert balances to simplified settlements
+    creditors = [[person, bal] for person, bal in balances.items() if bal > 0.01]
+    debtors = [[person, bal] for person, bal in balances.items() if bal < -0.01]
+    
+    # Sort by amount to optimize matching (greedy approach)
+    creditors.sort(key=lambda x: x[1], reverse=True)
+    debtors.sort(key=lambda x: x[1])
+    
+    settlements = []
+    i = 0
+    j = 0
+    
+    while i < len(debtors) and j < len(creditors):
+        debtor, debt_amount = debtors[i]
+        creditor, credit_amount = creditors[j]
+        
+        # The amount to settle is the minimum of what's owed and what's due
+        amount = min(abs(debt_amount), credit_amount)
+        if amount > 0.01:
+            settlements.append({"payer": debtor, "recipient": creditor, "amount": amount})
+        
+        # Update balances
+        debtors[i][1] += amount
+        creditors[j][1] -= amount
+        
+        # Move to next if settled
+        if abs(debtors[i][1]) < 0.01: i += 1
+        if creditors[j][1] < 0.01: j += 1
+        
+    return settlements
+
 def calculate_debts(expenses, members):
     """
     Calculate who owes whom based on expenses.
@@ -240,12 +289,25 @@ def calculate_debts(expenses, members):
             if person in balances:
                 balances[person] -= split_amount
     
-    # Convert balances to debts
-    debts = []
+    # Convert absolute balances to initial debts (one per debtor)
+    # Then simplify them
+    initial_debts = []
+    for person, bal in balances.items():
+        if bal < -0.01:
+            # This person owes money. For the initial list, we can say they owe 'the pool'.
+            # But calculate_settlements needs debtor/creditor.
+            # We'll just pass the balances logic to calculate_settlements directly 
+            # or adapt calculate_settlements to take either list or dict.
+            pass
+
+    # Actually, it's easier to just use the same logic as calculate_settlements
+    # but returning 'debtor'/'creditor' for calculate_debts for backward compatibility
+    # or just make calculate_debts return 'debtor'/'creditor' and use 'payer'/'recipient' for settlements.
+    
+    # Let's extract the simplification logic
     creditors = [[person, bal] for person, bal in balances.items() if bal > 0.01]
     debtors = [[person, bal] for person, bal in balances.items() if bal < -0.01]
     
-    # Sort by amount to optimize matching (greedy approach)
     creditors.sort(key=lambda x: x[1], reverse=True)
     debtors.sort(key=lambda x: x[1])
     
@@ -254,18 +316,13 @@ def calculate_debts(expenses, members):
     j = 0
     
     while i < len(debtors) and j < len(creditors):
-        debtor, debt = debtors[i]
-        creditor, credit = creditors[j]
-        
-        # The amount to settle is the minimum of what's owed and what's due
-        amount = min(abs(debt), credit)
-        transactions.append({"debtor": debtor, "creditor": creditor, "amount": amount})
-        
-        # Update balances
+        debtor, debt_amt = debtors[i]
+        creditor, credit_amt = creditors[j]
+        amount = min(abs(debt_amt), credit_amt)
+        if amount > 0.01:
+            transactions.append({"debtor": debtor, "creditor": creditor, "amount": amount})
         debtors[i][1] += amount
         creditors[j][1] -= amount
-        
-        # Move to next if settled
         if abs(debtors[i][1]) < 0.01: i += 1
         if creditors[j][1] < 0.01: j += 1
         

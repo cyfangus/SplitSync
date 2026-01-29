@@ -61,8 +61,8 @@ def create_demo_event():
         "settlements": [
             {
                 "id": "demo_settle_1",
-                "from_user": "Charlie",
-                "to_user": "You",
+                "payer": "Charlie",
+                "recipient": "You",
                 "amount": 50.00,
                 "date": str(datetime.now().date()),
                 "notes": "Partial payment for hotel"
