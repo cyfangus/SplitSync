@@ -256,20 +256,18 @@ def calculate_settlements(debts):
         
     return settlements
 
-def calculate_debts(expenses, members):
+def calculate_debts(expenses, members, settlements=None):
     """
-    Calculate who owes whom based on expenses.
+    Calculate who owes whom based on expenses and settlements.
     Returns list of debts: [{'debtor': str, 'creditor': str, 'amount': float}]
     """
     # Filter out settled expenses
     unsettled = [e for e in expenses if not e.get('settled', False)]
     
-    if not unsettled:
-        return []
-    
     # Calculate balances for each member
     balances = {member: 0.0 for member in members}
     
+    # Process expenses
     for expense in unsettled:
         payer = expense['payer']
         amount = expense['amount']
@@ -282,29 +280,27 @@ def calculate_debts(expenses, members):
         split_amount = amount / len(involved)
         
         # Payer gets credited
-        balances[payer] += amount
+        if payer in balances:
+            balances[payer] += amount
         
         # Each involved member gets debited their share
         for person in involved:
             if person in balances:
                 balances[person] -= split_amount
-    
-    # Convert absolute balances to initial debts (one per debtor)
-    # Then simplify them
-    initial_debts = []
-    for person, bal in balances.items():
-        if bal < -0.01:
-            # This person owes money. For the initial list, we can say they owe 'the pool'.
-            # But calculate_settlements needs debtor/creditor.
-            # We'll just pass the balances logic to calculate_settlements directly 
-            # or adapt calculate_settlements to take either list or dict.
-            pass
 
-    # Actually, it's easier to just use the same logic as calculate_settlements
-    # but returning 'debtor'/'creditor' for calculate_debts for backward compatibility
-    # or just make calculate_debts return 'debtor'/'creditor' and use 'payer'/'recipient' for settlements.
+    # Process settlements (payments)
+    if settlements:
+        for s in settlements:
+            payer = s.get('payer')
+            recipient = s.get('recipient')
+            amount = s.get('amount', 0.0)
+            
+            if payer in balances:
+                balances[payer] += amount
+            if recipient in balances:
+                balances[recipient] -= amount
     
-    # Let's extract the simplification logic
+    # Convert absolute balances to simplified debts
     creditors = [[person, bal] for person, bal in balances.items() if bal > 0.01]
     debtors = [[person, bal] for person, bal in balances.items() if bal < -0.01]
     
