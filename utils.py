@@ -277,6 +277,9 @@ def calculate_debts(expenses, members, settlements=None):
             involved = members
         
         # Split amount equally among involved members
+        if not involved:
+            continue
+            
         split_amount = amount / len(involved)
         
         # Payer gets credited

@@ -320,6 +320,7 @@ def remove_event_member(event_id, username):
         return False
     try:
         supabase.table('event_members').delete().eq('event_id', event_id).eq('username', username).execute()
+        load_data.clear()  # Clear cache
         return True
     except Exception as e:
         st.error(f"Failed to remove member: {str(e)}")
@@ -332,6 +333,7 @@ def update_member_role(event_id, username, new_role):
         return False
     try:
         supabase.table('event_members').update({'role': new_role}).eq('event_id', event_id).eq('username', username).execute()
+        load_data.clear()  # Clear cache
         return True
     except Exception as e:
         st.error(f"Failed to update role: {str(e)}")
@@ -352,12 +354,19 @@ def update_expense(expense_id, updates):
         if participants is not None:
             # Replace participants
             supabase.table('expense_participants').delete().eq('expense_id', expense_id).execute()
+            
+            # OPTIMIZATION: Batch insert participants
+            participants_to_insert = []
             for participant in participants:
-                supabase.table('expense_participants').insert({
+                participants_to_insert.append({
                     'expense_id': expense_id,
                     'username': participant
-                }).execute()
+                })
+            
+            if participants_to_insert:
+                supabase.table('expense_participants').insert(participants_to_insert).execute()
         
+        load_data.clear()  # Clear cache
         return True
     except Exception as e:
         st.error(f"Failed to update expense: {str(e)}")
@@ -371,6 +380,7 @@ def delete_expense(expense_id):
     try:
         supabase.table('expense_participants').delete().eq('expense_id', expense_id).execute()
         supabase.table('expenses').delete().eq('id', expense_id).execute()
+        load_data.clear()  # Clear cache
         return True
     except Exception as e:
         st.error(f"Failed to delete expense: {str(e)}")
@@ -384,6 +394,7 @@ def add_settlement(event_id, settlement_data):
     try:
         settlement_data['event_id'] = event_id
         supabase.table('settlements').insert(settlement_data).execute()
+        load_data.clear()  # Clear cache
         return True
     except Exception as e:
         st.error(f"Failed to add settlement: {str(e)}")
@@ -396,6 +407,7 @@ def delete_settlement(settlement_id):
         return False
     try:
         supabase.table('settlements').delete().eq('id', settlement_id).execute()
+        load_data.clear()  # Clear cache
         return True
     except Exception as e:
         st.error(f"Failed to delete settlement: {str(e)}")
@@ -408,6 +420,7 @@ def delete_event(event_id):
         return False
     try:
         supabase.table('events').delete().eq('id', event_id).execute()
+        load_data.clear()  # Clear cache
         return True
     except Exception as e:
         st.error(f"Failed to delete event: {str(e)}")

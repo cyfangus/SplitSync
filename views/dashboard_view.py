@@ -228,7 +228,8 @@ def render_events_list(data):
                             
                             if create_event(new_event):
                                 st.toast(f"✅ Event '{event_name}' created! Code: {access_code}", icon="🎉")
-                                st.info("Refresh the page to see your new event.")
+                                time.sleep(1)
+                                st.rerun()
                             else:
                                 st.error("❌ Failed to create event. Please check the error message above.")
                 else:
