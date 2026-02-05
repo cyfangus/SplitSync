@@ -163,7 +163,7 @@ def render_event_dashboard(current_event, data):
                     <span>👤 Paid by {row['payer']}</span>
                 </div>
                 <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #f0f0f0; font-size: 0.85em; display: flex; justify-content: space-between;">
-                    <span style="color: #888;">Split: {row['involved']}</span>
+                    <span style="color: #888;">Split: {row['involved']}{f" ({row.get('split_type', 'equally').title()})" if row.get('split_type', 'equally') != 'equally' else ""}</span>
                     <span style="color: {status_color}; font-weight: 600;">{status_text}</span>
                 </div>
             </div>

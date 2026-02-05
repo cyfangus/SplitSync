@@ -214,7 +214,9 @@ def add_expense(event_id, expense_data):
             'payer': expense_data['payer'],
             'category': expense_data.get('category'),
             'date': expense_data['date'],
-            'settled': expense_data.get('settled', False)
+            'settled': expense_data.get('settled', False),
+            'split_type': expense_data.get('split_type', 'equally'),
+            'split_data': expense_data.get('split_data', {})
         }
         response = supabase.table('expenses').insert(expense_record).execute()
         expense_id = response.data[0]['id']

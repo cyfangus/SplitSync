@@ -193,12 +193,45 @@ def render_add_expense(current_event):
             category = predicted_category
         
         involved = st.multiselect("Split Among", all_participants, default=all_participants)
+        
+        # Advanced Splitting Logic UI
+        split_type = st.selectbox("Split Method", ["Equally", "Exactly", "Percentages", "Shares"], index=0)
+        split_data = {}
+        
+        if split_type != "Equally" and involved:
+            st.markdown(f"#### ⚖️ Specify {split_type}")
+            cols = st.columns(min(len(involved), 3))
+            for i, person in enumerate(involved):
+                col_idx = i % 3
+                with cols[col_idx]:
+                    if split_type == "Exactly":
+                        split_data[person] = st.number_input(f"{person} ({event_currency})", min_value=0.0, step=0.01, key=f"add_exact_{person}")
+                    elif split_type == "Percentages":
+                        split_data[person] = st.number_input(f"{person} %", min_value=0.0, max_value=100.0, step=1.0, key=f"add_percent_{person}")
+                    elif split_type == "Shares":
+                        split_data[person] = st.number_input(f"{person} shares", min_value=0.0, step=0.5, value=1.0, key=f"add_share_{person}")
+
+        # Validation info
+        if split_type == "Percentages" and involved:
+            total_pct = sum(split_data.values())
+            if abs(total_pct - 100) > 0.01:
+                st.warning(f"⚠️ Total percentage must be 100% (Current: {total_pct:.1f}%)")
+        elif split_type == "Exactly" and involved:
+            # We'll check this against final_amount on submit
+            pass
+
         date = st.date_input("Date", datetime.today())
         
         submitted = st.form_submit_button("Save Expense", type="primary")
         
         if submitted:
             if title and involved:
+                # Validation of split data
+                if split_type == "Percentages":
+                    if abs(sum(split_data.values()) - 100) > 0.01:
+                        st.error("Total percentage must equal 100%")
+                        return
+                
                 # Check subscription limits
                 user_data = get_user_by_username(st.session_state.current_user)
                 
@@ -234,6 +267,12 @@ def render_add_expense(current_event):
                                 if amount_in_original > 0:
                                     exch_rate = final_amount / amount_in_original
                         
+                        if split_type == "Exactly":
+                            sum_exact = sum(split_data.values())
+                            if abs(sum_exact - final_amount) > 0.01:
+                                st.error(f"Total specified amounts ({sum_exact:.2f}) must match the expense total ({final_amount:.2f})")
+                                return
+
                         expense_data = {
                             "title": title,
                             "amount": final_amount,
@@ -244,7 +283,9 @@ def render_add_expense(current_event):
                             "involved": involved,
                             "date": str(date),
                             "category": category,
-                            "settled": False
+                            "settled": False,
+                            "split_type": split_type.lower(),
+                            "split_data": split_data
                         }
                         
                         if add_expense(current_event['id'], expense_data):
@@ -470,12 +511,40 @@ def render_edit_expenses(current_event):
                 current_involved = selected_expense.get('involved', all_participants)
                 new_involved = st.multiselect("Split Among", all_participants, default=current_involved)
                 
-                # Parse date
+                # Advanced Splitting Logic UI (Edit)
+                current_split_type = selected_expense.get('split_type', 'equally').capitalize()
+                split_methods = ["Equally", "Exactly", "Percentages", "Shares"]
                 try:
-                    current_date = datetime.strptime(selected_expense['date'], '%Y-%m-%d').date()
-                except:
-                    current_date = datetime.today().date()
+                    split_idx = split_methods.index(current_split_type)
+                except ValueError:
+                    split_idx = 0
                 
+                new_split_type = st.selectbox("Split Method", split_methods, index=split_idx, key=f"edit_split_type_{selected_expense['id']}")
+                new_split_data = {}
+                existing_split_data = selected_expense.get('split_data', {})
+                
+                if new_split_type != "Equally" and new_involved:
+                    st.markdown(f"#### ⚖️ Specify {new_split_type}")
+                    cols = st.columns(min(len(new_involved), 3))
+                    for i, person in enumerate(new_involved):
+                        col_idx = i % 3
+                        with cols[col_idx]:
+                            # Get existing value for this person if possible
+                            val = float(existing_split_data.get(person, 1.0 if new_split_type == "Shares" else 0.0))
+                            
+                            if new_split_type == "Exactly":
+                                new_split_data[person] = st.number_input(f"{person} ({event_currency})", min_value=0.0, step=0.01, value=val, key=f"edit_exact_{person}_{selected_expense['id']}")
+                            elif new_split_type == "Percentages":
+                                new_split_data[person] = st.number_input(f"{person} %", min_value=0.0, max_value=100.0, step=1.0, value=val, key=f"edit_percent_{person}_{selected_expense['id']}")
+                            elif new_split_type == "Shares":
+                                new_split_data[person] = st.number_input(f"{person} shares", min_value=0.0, step=0.5, value=val, key=f"edit_share_{person}_{selected_expense['id']}")
+
+                # Validation info
+                if new_split_type == "Percentages" and new_involved:
+                    total_pct = sum(new_split_data.values())
+                    if abs(total_pct - 100) > 0.01:
+                        st.warning(f"⚠️ Total percentage must be 100% (Current: {total_pct:.1f}%)")
+
                 new_date = st.date_input("Date", value=current_date)
                 
                 submitted = st.form_submit_button("Update Expense", type="primary", use_container_width=True)
@@ -515,6 +584,17 @@ def render_edit_expenses(current_event):
                                         if amount_in_original > 0:
                                             exch_rate = final_amount / amount_in_original
                                 
+                                # Validate split data
+                                if new_split_type == "Percentages":
+                                    if abs(sum(new_split_data.values()) - 100) > 0.01:
+                                        st.error("Total percentage must equal 100%")
+                                        return
+                                elif new_split_type == "Exactly":
+                                    sum_exact = sum(new_split_data.values())
+                                    if abs(sum_exact - final_amount) > 0.01:
+                                        st.error(f"Total specified amounts ({sum_exact:.2f}) must match the expense total ({final_amount:.2f})")
+                                        return
+
                                 updates = {
                                     'title': new_title,
                                     'amount': final_amount,
@@ -525,7 +605,9 @@ def render_edit_expenses(current_event):
                                     'category': new_category,
                                     'involved': new_involved,
                                     'date': str(new_date),
-                                    'settled': selected_expense.get('settled', False)
+                                    'settled': selected_expense.get('settled', False),
+                                    'split_type': new_split_type.lower(),
+                                    'split_data': new_split_data
                                 }
                                 
                                 if update_expense(selected_expense['id'], updates):

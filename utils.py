@@ -272,24 +272,46 @@ def calculate_debts(expenses, members, settlements=None):
         payer = expense['payer']
         amount = expense['amount']
         involved = expense.get('involved', members)
+        split_type = expense.get('split_type', 'equally')
+        split_data = expense.get('split_data', {}) # {username: value}
         
         if not involved:
             involved = members
-        
-        # Split amount equally among involved members
-        if not involved:
-            continue
             
-        split_amount = amount / len(involved)
+        # Calculate shares based on split type
+        shares = {member: 0.0 for member in involved}
+        
+        if split_type == 'equally' or not split_data:
+            split_amount = amount / len(involved)
+            for person in involved:
+                shares[person] = split_amount
+        elif split_type == 'exactly':
+            for person in involved:
+                shares[person] = float(split_data.get(person, 0.0))
+        elif split_type == 'percentages':
+            for person in involved:
+                percentage = float(split_data.get(person, 0.0))
+                shares[person] = (percentage / 100.0) * amount
+        elif split_type == 'shares':
+            total_shares = sum(float(v) for v in split_data.values())
+            if total_shares > 0:
+                for person in involved:
+                    member_shares = float(split_data.get(person, 0.0))
+                    shares[person] = (member_shares / total_shares) * amount
+            else:
+                # Fallback to equal if shares are zero
+                split_amount = amount / len(involved)
+                for person in involved:
+                    shares[person] = split_amount
         
         # Payer gets credited
         if payer in balances:
             balances[payer] += amount
         
         # Each involved member gets debited their share
-        for person in involved:
+        for person, share_amount in shares.items():
             if person in balances:
-                balances[person] -= split_amount
+                balances[person] -= share_amount
 
     # Process settlements (payments)
     if settlements:
