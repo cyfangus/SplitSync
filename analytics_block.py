@@ -71,7 +71,7 @@
                 
                 def create_pdf_report():
                     buffer = io.BytesIO()
-                    doc = SimpleDocTemplate(buffer, pagesize=letter)
+                    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
                     elements = []
                     styles = getSampleStyleSheet()
                     
@@ -88,27 +88,38 @@
                     # Expenses Table
                     if not df.empty:
                         elements.append(Paragraph("Expenses Summary", styles['Heading2']))
-                        data = [['Date', 'Title', 'Payer', 'Amount']]
+                        data = [['Date', 'Title', 'Payer', 'Amount', 'Split Among']]
                         for _, row in df.iterrows():
                             date_str = str(row['date'])
                             if isinstance(row['date'], (datetime, pd.Timestamp)):
                                 date_str = row['date'].strftime('%Y-%m-%d')
+                            
+                            # Build the split-among string
+                            involved = row.get('involved', [])
+                            if isinstance(involved, list):
+                                split_among = ', '.join(involved)
+                            else:
+                                split_among = str(involved)
                                 
                             data.append([
                                 date_str,
-                                row['title'][:30], # Truncate title
+                                row['title'][:30],  # Truncate long titles
                                 row['payer'],
-                                f"{row['amount']:.2f}"
+                                f"{row['amount']:.2f}",
+                                split_among
                             ])
                         
-                        t = Table(data)
+                        t = Table(data, repeatRows=1)
                         t.setStyle(TableStyle([
                             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('ALIGN', (4, 1), (4, -1), 'LEFT'),  # Left-align Split Among column
                             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, -1), 9),
                             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.beige, colors.white]),
                             ('GRID', (0, 0), (-1, -1), 1, colors.black)
                         ]))
                         elements.append(t)
