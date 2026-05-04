@@ -545,6 +545,10 @@ def render_edit_expenses(current_event):
                     if abs(total_pct - 100) > 0.01:
                         st.warning(f"⚠️ Total percentage must be 100% (Current: {total_pct:.1f}%)")
 
+                try:
+                    current_date = datetime.strptime(selected_expense['date'], "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    current_date = datetime.today().date()
                 new_date = st.date_input("Date", value=current_date)
                 
                 submitted = st.form_submit_button("Update Expense", type="primary", use_container_width=True)
